@@ -47,6 +47,10 @@ export default async function DashboardPage({
 
   const pendingCount = week.filter((a) => a.status === "pending").length;
 
+  const serviceName = (id: string) => services.find((s) => s.id === id)?.name ?? "Service";
+  const staffName = (id: string | null) =>
+    id ? (staff.find((s) => s.id === id)?.name ?? "Staff") : "Any available";
+
   return (
     <>
       <PageHeader

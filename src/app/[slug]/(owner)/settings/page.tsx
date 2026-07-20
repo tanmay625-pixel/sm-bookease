@@ -1,9 +1,21 @@
-import { createClerkSupabaseClient } from '@/lib/supabase/server';
-import { listStaff, createStaff, deleteStaff } from '@/app/actions/owner/staff';
-import { listServices, createService, deleteService } from '@/app/actions/owner/services';
-import { updateSalonSettings } from '@/app/actions/owner/salon';
-import type { SalonRow } from '@/lib/supabase/types';
-import Link from 'next/link';
+import { createStaff, deleteStaff } from "@/app/actions/owner/staff";
+import { createService, deleteService } from "@/app/actions/owner/services";
+import { updateSalonSettings } from "@/app/actions/owner/salon";
+import { getSalonBySlug, getStaff, getServices } from "@/lib/owner-data";
+import { PageHeader } from "@/components/owner/page-header";
+import { Card } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Input, Label } from "@/components/ui/field";
+import { Icon } from "@/components/ui/icon";
+import { formatDuration, formatPrice } from "@/lib/format";
+import {
+  Store01Icon,
+  UserMultipleIcon,
+  Scissor01Icon,
+  Delete02Icon,
+  Add01Icon,
+  Clock01Icon,
+} from "@hugeicons/core-free-icons";
 
 export default async function SettingsPage({
   params,
@@ -11,130 +23,217 @@ export default async function SettingsPage({
   params: Promise<{ slug: string }>;
 }) {
   const { slug } = await params;
-  const supabase = createClerkSupabaseClient();
-
-  const { data: salonData } = await supabase
-    .from('salons')
-    .select('*')
-    .eq('slug', slug)
-    .single();
-  const salon = salonData as SalonRow | null;
-
+  const salon = await getSalonBySlug(slug);
   const [staffList, servicesList] = await Promise.all([
-    salon ? listStaff(salon.id) : Promise.resolve([]),
-    salon ? listServices(salon.id) : Promise.resolve([]),
+    getStaff(salon.id),
+    getServices(salon.id),
   ]);
 
-  if (!salon) {
-    return <main style={{ padding: '2rem' }}><p>Salon not found.</p></main>;
+  const hours = (salon.working_hours ?? { start: "09:00", end: "19:00" }) as {
+    start: string;
+    end: string;
+  };
+
+  function initials(name: string) {
+    return name
+      .split(" ")
+      .map((p) => p[0])
+      .slice(0, 2)
+      .join("")
+      .toUpperCase();
   }
 
   return (
-    <main style={{ padding: '2rem', fontFamily: 'sans-serif' }}>
-      <h1>{salon.name} — Settings</h1>
-      <nav style={{ margin: '1rem 0' }}>
-        <Link href={`/${slug}/dashboard`}>← Dashboard</Link>
-      </nav>
+    <>
+      <PageHeader title="Settings" subtitle="Manage your shop, team and service menu." />
 
-      {/* ── Salon general settings ── */}
-      <section style={{ marginBottom: '2rem' }}>
-        <h2>General</h2>
-        <form
-          action={async (formData: FormData) => {
-            'use server';
-            const name = formData.get('name') as string;
-            const start = formData.get('start') as string;
-            const end = formData.get('end') as string;
-            await updateSalonSettings(salon.id, {
-              name,
-              workingHours: { start, end },
-            });
-          }}
-        >
-          <label>
-            Salon name
-            <input name="name" defaultValue={salon.name} required style={{ display: 'block', marginBottom: '0.5rem' }} />
-          </label>
-          <label>
-            Working hours start
-            <input name="start" type="time" defaultValue={(salon.working_hours as { start: string }).start} style={{ display: 'block', marginBottom: '0.5rem' }} />
-          </label>
-          <label>
-            Working hours end
-            <input name="end" type="time" defaultValue={(salon.working_hours as { end: string }).end} style={{ display: 'block', marginBottom: '0.5rem' }} />
-          </label>
-          <button type="submit">Save</button>
-        </form>
-      </section>
+      <div className="flex flex-col gap-6">
+        {/* General */}
+        <Card className="p-6">
+          <SectionTitle icon={Store01Icon} title="General" subtitle="Shop name and opening hours" />
+          <form
+            action={async (formData: FormData) => {
+              "use server";
+              await updateSalonSettings(salon.id, {
+                name: formData.get("name") as string,
+                workingHours: {
+                  start: formData.get("start") as string,
+                  end: formData.get("end") as string,
+                },
+              });
+            }}
+            className="mt-5 grid grid-cols-1 gap-4 sm:grid-cols-2"
+          >
+            <div className="sm:col-span-2">
+              <Label htmlFor="s-name">Salon name</Label>
+              <Input id="s-name" name="name" defaultValue={salon.name} required />
+            </div>
+            <div>
+              <Label htmlFor="s-start">Opens at</Label>
+              <Input id="s-start" name="start" type="time" defaultValue={hours.start} />
+            </div>
+            <div>
+              <Label htmlFor="s-end">Closes at</Label>
+              <Input id="s-end" name="end" type="time" defaultValue={hours.end} />
+            </div>
+            <div className="sm:col-span-2">
+              <Button type="submit" variant="primary">
+                Save changes
+              </Button>
+            </div>
+          </form>
+        </Card>
 
-      {/* ── Staff ── */}
-      <section style={{ marginBottom: '2rem' }}>
-        <h2>Staff ({staffList.length})</h2>
-        <ul>
-          {staffList.map((s) => (
-            <li key={s.id} style={{ display: 'flex', gap: '1rem', padding: '0.25rem 0' }}>
-              <span>{s.name} {s.role ? `(${s.role})` : ''}</span>
-              <form
-                action={async () => {
-                  'use server';
-                  await deleteStaff(s.id);
-                }}
+        {/* Staff */}
+        <Card className="p-6">
+          <SectionTitle
+            icon={UserMultipleIcon}
+            title={`Team (${staffList.length})`}
+            subtitle="Stylists and barbers customers can book with"
+          />
+          <ul className="mt-5 flex flex-col gap-2">
+            {staffList.map((s) => (
+              <li
+                key={s.id}
+                className="flex items-center gap-3 rounded-xl border border-border bg-background/60 px-3 py-2.5"
               >
-                <button type="submit">Remove</button>
-              </form>
-            </li>
-          ))}
-        </ul>
-        <form
-          style={{ marginTop: '1rem' }}
-          action={async (formData: FormData) => {
-            'use server';
-            const name = formData.get('name') as string;
-            const role = formData.get('role') as string;
-            await createStaff(salon.id, { name, role: role || null, email: null, phone: null });
-          }}
-        >
-          <input name="name" placeholder="Staff name" required style={{ marginRight: '0.5rem' }} />
-          <input name="role" placeholder="Role (optional)" style={{ marginRight: '0.5rem' }} />
-          <button type="submit">Add Staff</button>
-        </form>
-      </section>
+                <span className="flex h-9 w-9 items-center justify-center rounded-full bg-primary text-sm font-medium text-primary-foreground">
+                  {initials(s.name)}
+                </span>
+                <div className="min-w-0 flex-1">
+                  <p className="truncate text-sm font-medium text-foreground">{s.name}</p>
+                  {s.role && <p className="truncate text-xs text-muted-foreground">{s.role}</p>}
+                </div>
+                <form
+                  action={async () => {
+                    "use server";
+                    await deleteStaff(s.id);
+                  }}
+                >
+                  <Button type="submit" variant="ghost" size="icon" aria-label={`Remove ${s.name}`}>
+                    <Icon icon={Delete02Icon} size={18} className="text-destructive" />
+                  </Button>
+                </form>
+              </li>
+            ))}
+          </ul>
+          <form
+            action={async (formData: FormData) => {
+              "use server";
+              await createStaff(salon.id, {
+                name: formData.get("name") as string,
+                role: (formData.get("role") as string) || null,
+                email: null,
+                phone: null,
+              });
+            }}
+            className="mt-4 flex flex-col gap-3 border-t border-border pt-4 sm:flex-row sm:items-end"
+          >
+            <div className="flex-1">
+              <Label htmlFor="st-name">Name</Label>
+              <Input id="st-name" name="name" placeholder="e.g. Priya Sharma" required />
+            </div>
+            <div className="flex-1">
+              <Label htmlFor="st-role">Role</Label>
+              <Input id="st-role" name="role" placeholder="e.g. Senior Stylist" />
+            </div>
+            <Button type="submit" variant="accent">
+              <Icon icon={Add01Icon} size={18} />
+              Add
+            </Button>
+          </form>
+        </Card>
 
-      {/* ── Services ── */}
-      <section>
-        <h2>Services ({servicesList.length})</h2>
-        <ul>
-          {servicesList.map((s) => (
-            <li key={s.id} style={{ display: 'flex', gap: '1rem', padding: '0.25rem 0' }}>
-              <span>{s.name} — {s.duration_minutes}min — ₹{s.price}</span>
-              <form
-                action={async () => {
-                  'use server';
-                  await deleteService(s.id);
-                }}
+        {/* Services */}
+        <Card className="p-6">
+          <SectionTitle
+            icon={Scissor01Icon}
+            title={`Services (${servicesList.length})`}
+            subtitle="Your bookable menu with prices and durations"
+          />
+          <ul className="mt-5 grid grid-cols-1 gap-2 sm:grid-cols-2">
+            {servicesList.map((s) => (
+              <li
+                key={s.id}
+                className="flex items-center gap-3 rounded-xl border border-border bg-background/60 px-3 py-2.5"
               >
-                <button type="submit">Remove</button>
-              </form>
-            </li>
-          ))}
-        </ul>
-        <form
-          style={{ marginTop: '1rem' }}
-          action={async (formData: FormData) => {
-            'use server';
-            await createService(salon.id, {
-              name: formData.get('name') as string,
-              duration_minutes: parseInt(formData.get('duration') as string, 10),
-              price: parseFloat(formData.get('price') as string),
-            });
-          }}
-        >
-          <input name="name" placeholder="Service name" required style={{ marginRight: '0.5rem' }} />
-          <input name="duration" type="number" placeholder="Duration (min)" required style={{ width: '7rem', marginRight: '0.5rem' }} />
-          <input name="price" type="number" step="0.01" placeholder="Price (₹)" required style={{ width: '7rem', marginRight: '0.5rem' }} />
-          <button type="submit">Add Service</button>
-        </form>
-      </section>
-    </main>
+                <div className="min-w-0 flex-1">
+                  <p className="truncate text-sm font-medium text-foreground">{s.name}</p>
+                  <p className="flex items-center gap-2 text-xs text-muted-foreground">
+                    <span className="inline-flex items-center gap-1">
+                      <Icon icon={Clock01Icon} size={13} />
+                      {formatDuration(s.duration_minutes)}
+                    </span>
+                    <span className="font-medium text-accent-foreground/90">
+                      {formatPrice(s.price)}
+                    </span>
+                  </p>
+                </div>
+                <form
+                  action={async () => {
+                    "use server";
+                    await deleteService(s.id);
+                  }}
+                >
+                  <Button type="submit" variant="ghost" size="icon" aria-label={`Remove ${s.name}`}>
+                    <Icon icon={Delete02Icon} size={18} className="text-destructive" />
+                  </Button>
+                </form>
+              </li>
+            ))}
+          </ul>
+          <form
+            action={async (formData: FormData) => {
+              "use server";
+              await createService(salon.id, {
+                name: formData.get("name") as string,
+                duration_minutes: parseInt(formData.get("duration") as string, 10),
+                price: parseFloat(formData.get("price") as string),
+              });
+            }}
+            className="mt-4 flex flex-col gap-3 border-t border-border pt-4 sm:flex-row sm:items-end"
+          >
+            <div className="flex-1">
+              <Label htmlFor="sv-name">Service name</Label>
+              <Input id="sv-name" name="name" placeholder="e.g. Haircut & Style" required />
+            </div>
+            <div className="sm:w-32">
+              <Label htmlFor="sv-duration">Minutes</Label>
+              <Input id="sv-duration" name="duration" type="number" min="5" placeholder="45" required />
+            </div>
+            <div className="sm:w-32">
+              <Label htmlFor="sv-price">Price (₹)</Label>
+              <Input id="sv-price" name="price" type="number" min="0" step="1" placeholder="650" required />
+            </div>
+            <Button type="submit" variant="accent">
+              <Icon icon={Add01Icon} size={18} />
+              Add
+            </Button>
+          </form>
+        </Card>
+      </div>
+    </>
+  );
+}
+
+function SectionTitle({
+  icon,
+  title,
+  subtitle,
+}: {
+  icon: typeof Store01Icon;
+  title: string;
+  subtitle: string;
+}) {
+  return (
+    <div className="flex items-center gap-3">
+      <span className="flex h-11 w-11 items-center justify-center rounded-xl bg-secondary text-primary">
+        <Icon icon={icon} size={22} />
+      </span>
+      <div>
+        <h2 className="font-heading text-lg text-foreground">{title}</h2>
+        <p className="text-sm text-muted-foreground">{subtitle}</p>
+      </div>
+    </div>
   );
 }
