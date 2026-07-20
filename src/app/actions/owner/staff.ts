@@ -19,14 +19,14 @@ export async function listStaff(salonId: string): Promise<StaffRow[]> {
   await requireAuth();
   const supabase = createClerkSupabaseClient();
 
-  const { data, error } = await supabase
+  const { data: staffData, error } = await supabase
     .from('staff')
     .select('*')
     .eq('salon_id', salonId)
     .order('created_at', { ascending: true });
 
   if (error) throw new Error(`Failed to list staff: ${error.message}`);
-  return data ?? [];
+  return (staffData ?? []) as StaffRow[];
 }
 
 export async function createStaff(
@@ -36,11 +36,13 @@ export async function createStaff(
   await requireAuth();
   const supabase = createClerkSupabaseClient();
 
-  const { data: created, error } = await supabase
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const { data: createdData, error } = await (supabase as any)
     .from('staff')
     .insert({ ...data, salon_id: salonId })
     .select()
-    .single();
+    .single() as { data: StaffRow | null; error: { message: string } | null };
+  const created = createdData;
 
   if (error || !created) {
     throw new Error(`Failed to create staff: ${error?.message ?? 'unknown'}`);
@@ -58,7 +60,8 @@ export async function updateStaff(
   const supabase = createClerkSupabaseClient();
 
   // RLS ensures only the owner can update staff in their salon
-  const { error } = await supabase
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const { error } = await (supabase as any)
     .from('staff')
     .update(data)
     .eq('id', staffId);
@@ -71,7 +74,8 @@ export async function deleteStaff(staffId: string): Promise<void> {
   await requireAuth();
   const supabase = createClerkSupabaseClient();
 
-  const { error } = await supabase
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const { error } = await (supabase as any)
     .from('staff')
     .delete()
     .eq('id', staffId);

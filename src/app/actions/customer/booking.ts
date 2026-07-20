@@ -105,10 +105,15 @@ export async function getAvailableSlots(
     apptQuery = apptQuery.eq('staff_id', staffIdOrAny);
   }
 
-  const { data: existingAppointments } = await apptQuery;
+  const { data: apptData } = await apptQuery;
+  const existingAppointments = (apptData ?? []) as Array<{
+    slot_start: string;
+    slot_end: string;
+    staff_id: string | null;
+  }>;
 
   // Build set of busy intervals
-  const busyIntervals = (existingAppointments ?? []).map((a) => ({
+  const busyIntervals = existingAppointments.map((a) => ({
     start: new Date(a.slot_start).getTime(),
     end: new Date(a.slot_end).getTime(),
   }));
@@ -192,34 +197,38 @@ export async function createAppointmentAsCustomer(
     conflictQuery = conflictQuery.eq('staff_id', input.staffId);
   }
 
-  const { data: conflicts } = await conflictQuery;
-  if (conflicts && conflicts.length > 0) {
+  const { data: conflictsData } = await conflictQuery;
+  const conflicts = (conflictsData ?? []) as Array<{ id: string }>;
+  if (conflicts.length > 0) {
     throw new Error('This slot was just booked by someone else — please pick another');
   }
 
   // ── Upsert customer record ────────────────────────────────────────────────
   // We don't have the customer's name at OTP time — use phone as placeholder
   // if it's a first visit. The UI should collect the name before booking.
-  const { data: customer, error: customerError } = await supabase
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const { data: customerData, error: customerError } = await (supabase as any)
     .from('customers')
     .upsert(
-      { salon_id: salon.id, phone: session.phone, name: session.phone },
+      { salon_id: salon.id, phone: session.phone, name: session.phone, email: null },
       { onConflict: 'salon_id,phone', ignoreDuplicates: true }
     )
     .select()
-    .single();
+    .single() as { data: CustomerRow | null; error: { message: string } | null };
+  const customer = customerData;
 
   // If upsert returned nothing (ignoreDuplicates on existing row), fetch explicitly
   let resolvedCustomer: CustomerRow;
   if (customer) {
     resolvedCustomer = customer;
   } else {
-    const { data: existing, error: fetchErr } = await supabase
+    const { data: existingData, error: fetchErr } = await supabase
       .from('customers')
       .select('*')
       .eq('salon_id', salon.id)
       .eq('phone', session.phone)
       .single();
+    const existing = existingData as CustomerRow | null;
 
     if (fetchErr || !existing) {
       throw new Error(`Failed to resolve customer: ${customerError?.message ?? fetchErr?.message}`);
@@ -228,7 +237,8 @@ export async function createAppointmentAsCustomer(
   }
 
   // ── Insert appointment ────────────────────────────────────────────────────
-  const { data: appointment, error: apptError } = await supabase
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const { data: appointmentData, error: apptError } = await (supabase as any)
     .from('appointments')
     .insert({
       salon_id: salon.id,
@@ -242,7 +252,8 @@ export async function createAppointmentAsCustomer(
       created_by: 'customer',
     })
     .select()
-    .single();
+    .single() as { data: AppointmentRow | null; error: { message: string } | null };
+  const appointment = appointmentData;
 
   if (apptError || !appointment) {
     throw new Error(`Failed to create appointment: ${apptError?.message ?? 'unknown'}`);
@@ -262,12 +273,13 @@ export async function listMyAppointments(salonSlug: string): Promise<
   const { session, salon, supabase } = await requireCustomerSession(salonSlug);
 
   // Find customer record for this phone
-  const { data: customer } = await supabase
+  const { data: customerData } = await supabase
     .from('customers')
     .select('id')
     .eq('salon_id', salon.id)
     .eq('phone', session.phone)
     .single();
+  const customer = customerData as { id: string } | null;
 
   if (!customer) return [];
 

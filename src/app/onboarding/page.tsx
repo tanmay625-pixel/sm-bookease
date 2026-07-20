@@ -9,11 +9,12 @@ export default async function OnboardingPage() {
 
   // If the user already has a salon, go straight to dashboard
   const supabase = createClerkSupabaseClient();
-  const { data: existingSalon } = await supabase
+  const { data: salonData } = await supabase
     .from('salons')
     .select('slug')
     .eq('owner_clerk_id', userId)
     .single();
+  const existingSalon = salonData as { slug: string } | null;
 
   if (existingSalon) {
     redirect(`/${existingSalon.slug}/dashboard`);

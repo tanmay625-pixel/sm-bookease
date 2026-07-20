@@ -80,7 +80,7 @@ export type Database = {
         Insert: Omit<
           Database['public']['Tables']['customers']['Row'],
           'id' | 'created_at'
-        >;
+        > & { email?: string | null };
         Update: Partial<Database['public']['Tables']['customers']['Insert']>;
       };
       appointments: {

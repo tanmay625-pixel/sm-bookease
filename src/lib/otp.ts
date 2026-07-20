@@ -40,7 +40,8 @@ export async function storeOtp(
   const supabase = createServiceSupabaseClient();
 
   // Delete any existing codes for this (salon, phone) — avoids accumulation
-  await supabase
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  await (supabase as any)
     .from('otp_codes')
     .delete()
     .eq('salon_id', salonId)
@@ -50,7 +51,8 @@ export async function storeOtp(
     Date.now() + OTP_TTL_MINUTES * 60 * 1_000
   ).toISOString();
 
-  const { error } = await supabase.from('otp_codes').insert({
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const { error } = await (supabase as any).from('otp_codes').insert({
     salon_id: salonId,
     phone,
     code_hash: hashOtp(code),
@@ -74,7 +76,7 @@ export async function verifyStoredOtp(
 ): Promise<boolean> {
   const supabase = createServiceSupabaseClient();
 
-  const { data } = await supabase
+  const { data: otpData } = await supabase
     .from('otp_codes')
     .select('id, code_hash, expires_at')
     .eq('salon_id', salonId)
@@ -82,6 +84,7 @@ export async function verifyStoredOtp(
     .order('created_at', { ascending: false })
     .limit(1)
     .single();
+  const data = otpData as { id: string; code_hash: string; expires_at: string } | null;
 
   if (!data) return false;
 
@@ -94,7 +97,8 @@ export async function verifyStoredOtp(
 
   if (valid) {
     // Delete on success — single use
-    await supabase.from('otp_codes').delete().eq('id', data.id);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    await (supabase as any).from('otp_codes').delete().eq('id', data.id);
   }
 
   return valid;

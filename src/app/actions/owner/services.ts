@@ -19,14 +19,14 @@ export async function listServices(salonId: string): Promise<ServiceRow[]> {
   await requireAuth();
   const supabase = createClerkSupabaseClient();
 
-  const { data, error } = await supabase
+  const { data: servicesData, error } = await supabase
     .from('services')
     .select('*')
     .eq('salon_id', salonId)
     .order('created_at', { ascending: true });
 
   if (error) throw new Error(`Failed to list services: ${error.message}`);
-  return data ?? [];
+  return (servicesData ?? []) as ServiceRow[];
 }
 
 export async function createService(
@@ -36,11 +36,13 @@ export async function createService(
   await requireAuth();
   const supabase = createClerkSupabaseClient();
 
-  const { data: created, error } = await supabase
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const { data: createdData, error } = await (supabase as any)
     .from('services')
     .insert({ ...data, salon_id: salonId })
     .select()
-    .single();
+    .single() as { data: ServiceRow | null; error: { message: string } | null };
+  const created = createdData;
 
   if (error || !created) {
     throw new Error(`Failed to create service: ${error?.message ?? 'unknown'}`);
@@ -57,7 +59,8 @@ export async function updateService(
   await requireAuth();
   const supabase = createClerkSupabaseClient();
 
-  const { error } = await supabase
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const { error } = await (supabase as any)
     .from('services')
     .update(data)
     .eq('id', serviceId);
@@ -70,7 +73,8 @@ export async function deleteService(serviceId: string): Promise<void> {
   await requireAuth();
   const supabase = createClerkSupabaseClient();
 
-  const { error } = await supabase
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const { error } = await (supabase as any)
     .from('services')
     .delete()
     .eq('id', serviceId);

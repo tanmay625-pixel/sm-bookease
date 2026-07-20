@@ -26,12 +26,13 @@ export async function generateSlug(salonName: string): Promise<string> {
   const supabase = createServiceSupabaseClient();
 
   // Fetch all slugs that start with the base to check collisions efficiently
-  const { data: existing } = await supabase
+  const { data: slugData } = await supabase
     .from('salons')
     .select('slug')
     .or(`slug.eq.${base},slug.like.${base}-%`);
+  const existing = (slugData ?? []) as Array<{ slug: string }>;
 
-  const existingSlugs = new Set((existing ?? []).map((r) => r.slug));
+  const existingSlugs = new Set(existing.map((r) => r.slug));
 
   if (!existingSlugs.has(base)) return base;
 

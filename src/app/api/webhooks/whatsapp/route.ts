@@ -45,7 +45,8 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     const entries = extractLogEntries(body);
 
     if (entries.length > 0) {
-      await supabase.from('message_log').insert(entries);
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      await (supabase as any).from('message_log').insert(entries);
     }
   } catch (err) {
     // Non-fatal — always acknowledge so Meta doesn't retry endlessly

@@ -90,7 +90,8 @@ export async function createAppointmentAsOwner(
   const userId = await requireAuth();
   const supabase = createClerkSupabaseClient();
 
-  const { data, error } = await supabase
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const { data: apptData, error } = await (supabase as any)
     .from('appointments')
     .insert({
       salon_id: input.salonId,
@@ -104,7 +105,8 @@ export async function createAppointmentAsOwner(
       created_by: userId, // owner's Clerk ID
     })
     .select()
-    .single();
+    .single() as { data: AppointmentRow | null; error: { message: string } | null };
+  const data = apptData;
 
   if (error || !data) {
     throw new Error(`Failed to create appointment: ${error?.message ?? 'unknown'}`);
@@ -126,17 +128,19 @@ export async function updateAppointmentStatus(
   const supabase = createClerkSupabaseClient();
 
   // Fetch the appointment first so we can get customer phone + service info for the WA message
-  const { data: existing, error: fetchError } = await supabase
+  const { data: existingData, error: fetchError } = await supabase
     .from('appointments')
     .select('*, customers(*), services(*), salons(*)')
     .eq('id', appointmentId)
     .single();
+  const existing = existingData as (AppointmentRow & { customers: CustomerRow | null }) | null;
 
   if (fetchError || !existing) {
     throw new Error(`Appointment not found: ${fetchError?.message ?? 'unknown'}`);
   }
 
-  const { error } = await supabase
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const { error } = await (supabase as any)
     .from('appointments')
     .update({ status })
     .eq('id', appointmentId);
@@ -191,9 +195,9 @@ export async function listClients(
     query = query.or(`name.ilike.%${search}%,phone.ilike.%${search}%`);
   }
 
-  const { data, error } = await query;
+  const { data: clientsData, error } = await query;
   if (error) throw new Error(`Failed to list clients: ${error.message}`);
-  return data ?? [];
+  return (clientsData ?? []) as CustomerRow[];
 }
 
 export async function getClientDetail(clientId: string): Promise<

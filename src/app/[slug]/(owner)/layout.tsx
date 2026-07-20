@@ -1,6 +1,7 @@
 import { auth } from '@clerk/nextjs/server';
 import { redirect } from 'next/navigation';
 import { createClerkSupabaseClient } from '@/lib/supabase/server';
+import type { SalonRow } from '@/lib/supabase/types';
 
 /**
  * Owner route group layout.
@@ -32,12 +33,13 @@ export default async function OwnerLayout({
 
   const supabase = createClerkSupabaseClient();
 
-  const { data: salon } = await supabase
+  const { data: salonData } = await supabase
     .from('salons')
     .select('id, name')
     .eq('slug', slug)
     .eq('owner_clerk_id', userId)
     .single();
+  const salon = salonData as SalonRow | null;
 
   if (!salon) {
     // This user doesn't own a salon at this slug — redirect to home

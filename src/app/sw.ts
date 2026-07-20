@@ -1,6 +1,6 @@
 import { defaultCache } from '@serwist/next/worker';
 import type { PrecacheEntry, SerwistGlobalConfig } from 'serwist';
-import { Serwist } from 'serwist';
+import { NetworkFirst, Serwist } from 'serwist';
 
 // Extend ServiceWorkerGlobalScope with Serwist's injected manifest
 declare global {
@@ -20,11 +20,10 @@ const serwist = new Serwist({
     // Network-first for API and server action routes (fresh data matters)
     {
       matcher: /^\/api\//,
-      handler: 'NetworkFirst',
-      options: {
+      handler: new NetworkFirst({
         cacheName: 'api-cache',
         networkTimeoutSeconds: 10,
-      },
+      }),
     },
     // Cache-first for everything else via defaultCache (static assets, fonts, etc.)
     ...defaultCache,

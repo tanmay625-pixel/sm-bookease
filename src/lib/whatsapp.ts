@@ -115,7 +115,8 @@ export async function sendWhatsAppMessage(
   // Log the send attempt (service-role — message_log has RLS-on/no-policies)
   try {
     const supabase = createServiceSupabaseClient();
-    await supabase.from('message_log').insert({
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    await (supabase as any).from('message_log').insert({
       salon_id: salonId ?? null,
       phone: to,
       template_name: templateName,

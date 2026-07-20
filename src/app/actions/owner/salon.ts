@@ -5,6 +5,7 @@ import { revalidatePath } from 'next/cache';
 import { redirect } from 'next/navigation';
 import { createClerkSupabaseClient } from '@/lib/supabase/server';
 import { generateSlug } from '@/lib/slug';
+import type { SalonRow } from '@/lib/supabase/types';
 
 // ─────────────────────────────────────────────
 // createSalon
@@ -18,11 +19,13 @@ export async function createSalon(name: string): Promise<{ slug: string }> {
   const slug = await generateSlug(name);
   const supabase = createClerkSupabaseClient();
 
-  const { data, error } = await supabase
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const { data: salonData, error } = await (supabase as any)
     .from('salons')
     .insert({ owner_clerk_id: userId, name, slug })
     .select('slug')
-    .single();
+    .single() as { data: { slug: string } | null; error: { message: string } | null };
+  const data = salonData;
 
   if (error || !data) {
     throw new Error(`Failed to create salon: ${error?.message ?? 'unknown error'}`);
@@ -56,7 +59,8 @@ export async function updateSalonSettings(
   if (settings.workingDays !== undefined) update.working_days = settings.workingDays;
 
   // RLS ensures only the owner of this salon can update it
-  const { error } = await supabase
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const { error } = await (supabase as any)
     .from('salons')
     .update(update)
     .eq('id', salonId);
@@ -78,11 +82,12 @@ export async function getSalonBySlug(slug: string) {
 
   const supabase = createClerkSupabaseClient();
 
-  const { data, error } = await supabase
+  const { data: salonData, error } = await supabase
     .from('salons')
     .select('*')
     .eq('slug', slug)
     .single();
+  const data = salonData as SalonRow | null;
 
   if (error || !data) return null;
   return data;
