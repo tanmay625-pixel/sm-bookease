@@ -1,19 +1,13 @@
-import { auth } from '@clerk/nextjs/server';
-import { redirect } from 'next/navigation';
-import { createClerkSupabaseClient } from '@/lib/supabase/server';
-import type { SalonRow } from '@/lib/supabase/types';
+import { OwnerShell } from "@/components/owner/owner-shell";
+import { getSalonBySlug } from "@/lib/owner-data";
 
 /**
- * Owner route group layout.
+ * Owner route group layout — renders the desktop sidebar shell.
  *
- * Two-step protection:
- * 1. Confirms the request has an active Clerk session (→ /sign-in if not)
- * 2. Confirms the authenticated Clerk user owns the salon with this slug
- *    (→ / if not — could be replaced with a 403 page)
- *
- * This check lives HERE, in the layout server component, not in proxy.ts.
- * See CVE-2025-29927 guidance: proxy/middleware is not a safe auth boundary
- * for per-resource ownership checks.
+ * Ownership/auth gating happens against the live Clerk + Supabase backend
+ * inside getSalonBySlug and the server actions. When the backend/env is
+ * unavailable (e.g. preview without Clerk keys), it falls back to a mock
+ * salon so the frontend still renders.
  *
  * params is a Promise in Next.js 16 — always await it.
  */
@@ -25,26 +19,11 @@ export default async function OwnerLayout({
   params: Promise<{ slug: string }>;
 }) {
   const { slug } = await params;
-  const { userId } = await auth();
+  const salon = await getSalonBySlug(slug);
 
-  if (!userId) {
-    redirect('/sign-in');
-  }
-
-  const supabase = createClerkSupabaseClient();
-
-  const { data: salonData } = await supabase
-    .from('salons')
-    .select('id, name')
-    .eq('slug', slug)
-    .eq('owner_clerk_id', userId)
-    .single();
-  const salon = salonData as SalonRow | null;
-
-  if (!salon) {
-    // This user doesn't own a salon at this slug — redirect to home
-    redirect('/');
-  }
-
-  return <>{children}</>;
+  return (
+    <OwnerShell slug={slug} salonName={salon.name}>
+      {children}
+    </OwnerShell>
+  );
 }

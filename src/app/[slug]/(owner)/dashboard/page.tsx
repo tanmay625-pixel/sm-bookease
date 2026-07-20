@@ -1,8 +1,19 @@
-import { createClerkSupabaseClient } from '@/lib/supabase/server';
-import { listAppointments } from '@/app/actions/owner/appointments';
-import { UserButton } from '@clerk/nextjs';
-import type { SalonRow } from '@/lib/supabase/types';
-import Link from 'next/link';
+import { getSalonBySlug, getAppointments, getClients, getStaff, getServices } from "@/lib/owner-data";
+import { PageHeader } from "@/components/owner/page-header";
+import { StatCard } from "@/components/owner/stat-card";
+import { NewAppointmentButton } from "@/components/owner/new-appointment-button";
+import { AppointmentActions } from "@/components/owner/appointment-actions";
+import { AppointmentStub } from "@/components/appointment-stub";
+import { Card } from "@/components/ui/card";
+import { Icon } from "@/components/ui/icon";
+import { formatTimeRange } from "@/lib/format";
+import {
+  Calendar03Icon,
+  CalendarCheckIn01Icon,
+  Clock01Icon,
+  UserMultipleIcon,
+  InboxIcon,
+} from "@hugeicons/core-free-icons";
 
 export default async function DashboardPage({
   params,
@@ -10,56 +21,85 @@ export default async function DashboardPage({
   params: Promise<{ slug: string }>;
 }) {
   const { slug } = await params;
-  const supabase = createClerkSupabaseClient();
+  const salon = await getSalonBySlug(slug);
 
-  const { data: salonData } = await supabase
-    .from('salons')
-    .select('id, name')
-    .eq('slug', slug)
-    .single();
-  const salon = salonData as SalonRow | null;
+  const now = new Date();
+  const startOfDay = new Date(now);
+  startOfDay.setHours(0, 0, 0, 0);
+  const endOfDay = new Date(now);
+  endOfDay.setHours(23, 59, 59, 999);
+  const endOfWeek = new Date(startOfDay);
+  endOfWeek.setDate(endOfWeek.getDate() + 7);
 
-  const today = new Date().toISOString().split('T')[0];
-  const appointments = salon
-    ? await listAppointments(salon.id, {
-        dateFrom: `${today}T00:00:00`,
-        dateTo: `${today}T23:59:59`,
-      })
-    : [];
+  const [today, week, clients, staff, services] = await Promise.all([
+    getAppointments(salon.id, {
+      dateFrom: startOfDay.toISOString(),
+      dateTo: endOfDay.toISOString(),
+    }),
+    getAppointments(salon.id, {
+      dateFrom: startOfDay.toISOString(),
+      dateTo: endOfWeek.toISOString(),
+    }),
+    getClients(salon.id),
+    getStaff(salon.id),
+    getServices(salon.id),
+  ]);
+
+  const pendingCount = week.filter((a) => a.status === "pending").length;
 
   return (
-    <main style={{ padding: '2rem', fontFamily: 'sans-serif' }}>
-      <header style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-        <h1>{salon?.name ?? slug} — Dashboard</h1>
-        <UserButton />
-      </header>
+    <>
+      <PageHeader
+        title="Dashboard"
+        subtitle={`Here's what's happening at ${salon.name} today.`}
+        action={<NewAppointmentButton services={services} staff={staff} />}
+      />
 
-      <nav style={{ margin: '1rem 0', display: 'flex', gap: '1rem' }}>
-        <Link href={`/${slug}/appointments`}>Appointments</Link>
-        <Link href={`/${slug}/clients`}>Clients</Link>
-        <Link href={`/${slug}/settings`}>Settings</Link>
-      </nav>
+      <div className="grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-4">
+        <StatCard label="Today's appointments" value={today.length} icon={Calendar03Icon} tint="primary" />
+        <StatCard label="This week" value={week.length} icon={CalendarCheckIn01Icon} tint="primary" />
+        <StatCard label="Pending" value={pendingCount} icon={Clock01Icon} tint="accent" />
+        <StatCard label="Total clients" value={clients.length} icon={UserMultipleIcon} tint="primary" />
+      </div>
 
-      <section>
-        <h2>Today&apos;s Appointments ({appointments.length})</h2>
-        {appointments.length === 0 ? (
-          <p>No appointments today.</p>
+      <section className="mt-8">
+        <div className="mb-4 flex items-center justify-between">
+          <h2 className="font-heading text-xl text-foreground">Today&apos;s appointments</h2>
+          <span className="text-sm text-muted-foreground">{today.length} scheduled</span>
+        </div>
+
+        {today.length === 0 ? (
+          <EmptyToday />
         ) : (
-          <ul>
-            {appointments.map((a) => (
-              <li key={a.id}>
-                {new Date(a.slot_start).toLocaleTimeString()} —{' '}
-                {a.customers?.name ?? 'Unknown'} ({a.status})
-              </li>
+          <div className="flex flex-col gap-3">
+            {today.map((a) => (
+              <AppointmentStub
+                key={a.id}
+                clientName={a.customers?.name ?? "Unknown"}
+                serviceName={serviceName(a.service_id)}
+                staffName={staffName(a.staff_id)}
+                timeLabel={formatTimeRange(a.slot_start, a.slot_end)}
+                status={a.status}
+                actions={<AppointmentActions status={a.status} />}
+              />
             ))}
-          </ul>
+          </div>
         )}
       </section>
+    </>
+  );
+}
 
-      {/* Placeholder for real-time day schedule — UI component goes here */}
-      <section style={{ marginTop: '2rem', padding: '1rem', border: '1px dashed #ccc' }}>
-        <p>[Day schedule calendar — v0 component slot]</p>
-      </section>
-    </main>
+function EmptyToday() {
+  return (
+    <Card className="flex flex-col items-center justify-center gap-3 px-6 py-14 text-center">
+      <span className="flex h-14 w-14 items-center justify-center rounded-2xl bg-secondary text-muted-foreground">
+        <Icon icon={InboxIcon} size={28} />
+      </span>
+      <h3 className="font-heading text-xl text-foreground">No appointments today</h3>
+      <p className="max-w-sm text-sm text-muted-foreground">
+        They&apos;ll show up here as customers book. Use New Appointment to add one manually.
+      </p>
+    </Card>
   );
 }
