@@ -1,10 +1,10 @@
 import { createServiceSupabaseClient } from '@/lib/supabase/service';
 import { getAvailableSlots } from '@/app/actions/customer/booking';
-import { redirect } from 'next/navigation';
 import { cookies } from 'next/headers';
 import { verifySessionCookie } from '@/lib/otp';
 import type { Database } from '@/lib/supabase/types';
 import Link from 'next/link';
+import BookSlots from './BookSlots';
 
 type ServiceRow = Database['public']['Tables']['services']['Row'];
 type StaffRow = Database['public']['Tables']['staff']['Row'];
@@ -19,14 +19,14 @@ export default async function BookPage({
   const { slug } = await params;
   const { serviceId, staffId, date } = await searchParams;
 
-  // Check customer session
+  // Session is optional on this page: browsing services and slots is public.
+  // createAppointmentAsCustomer enforces auth server-side inside BookSlots.
+  // We read the cookie here only so we can pass isSignedIn down to BookSlots
+  // to decide whether to show slot buttons or a sign-in prompt.
   const cookieStore = await cookies();
   const token = cookieStore.get('bookease_session')?.value;
   const session = token ? await verifySessionCookie(token) : null;
-
-  if (!session) {
-    redirect(`/${slug}/sign-in`);
-  }
+  const isSignedIn = session !== null;
 
   const supabase = createServiceSupabaseClient();
 
@@ -52,7 +52,7 @@ export default async function BookPage({
   const services = (servicesData ?? []) as ServiceRow[];
   const staffList = (staffData ?? []) as StaffRow[];
 
-  // Compute slots if a service + date are selected
+  // Compute slots if a service + date are selected (public, no session required)
   const slots =
     salon && serviceId && date
       ? await getAvailableSlots(slug, serviceId, staffId ?? 'any', date).catch(
@@ -111,24 +111,17 @@ export default async function BookPage({
         </section>
       )}
 
-      {/* Step 3 — select slot */}
+      {/* Step 3 — select slot (client component — calls createAppointmentAsCustomer directly) */}
       {slots.length > 0 && (
         <section>
           <h2>3. Choose a slot</h2>
-          <ul style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem', listStyle: 'none', padding: 0 }}>
-            {slots.map((slot) => (
-              <li key={slot.slotStart}>
-                <form action={`/${slug}/book/confirm`} method="GET">
-                  <input type="hidden" name="serviceId" value={serviceId} />
-                  <input type="hidden" name="staffId" value={staffId ?? 'any'} />
-                  <input type="hidden" name="slotStart" value={slot.slotStart} />
-                  <button type="submit" style={{ padding: '0.5rem 1rem', cursor: 'pointer' }}>
-                    {new Date(slot.slotStart).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                  </button>
-                </form>
-              </li>
-            ))}
-          </ul>
+          <BookSlots
+            slug={slug}
+            serviceId={serviceId!}
+            staffId={staffId ?? 'any'}
+            slots={slots}
+            isSignedIn={isSignedIn}
+          />
         </section>
       )}
 

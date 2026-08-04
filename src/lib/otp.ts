@@ -3,9 +3,14 @@ import crypto from 'crypto';
 import { SignJWT, jwtVerify } from 'jose';
 import { createServiceSupabaseClient } from '@/lib/supabase/service';
 
-const SESSION_SECRET = new TextEncoder().encode(
-  process.env.CUSTOMER_SESSION_SECRET!
-);
+const _rawSecret = process.env.CUSTOMER_SESSION_SECRET;
+if (!_rawSecret) {
+  throw new Error(
+    '[otp.ts] CUSTOMER_SESSION_SECRET environment variable is not set. ' +
+    'Generate one with: node -e "console.log(require(\'crypto\').randomBytes(32).toString(\'base64url\'))"'
+  );
+}
+const SESSION_SECRET = new TextEncoder().encode(_rawSecret);
 const SESSION_TTL_DAYS = 7;
 const OTP_TTL_MINUTES = 10;
 

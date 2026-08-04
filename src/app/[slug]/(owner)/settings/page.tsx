@@ -1,9 +1,11 @@
 import { createClerkSupabaseClient } from '@/lib/supabase/server';
-import { listStaff, createStaff, deleteStaff } from '@/app/actions/owner/staff';
-import { listServices, createService, deleteService } from '@/app/actions/owner/services';
+import { listStaff, createStaff } from '@/app/actions/owner/staff';
+import { listServices, createService } from '@/app/actions/owner/services';
 import { updateSalonSettings } from '@/app/actions/owner/salon';
 import type { SalonRow } from '@/lib/supabase/types';
 import Link from 'next/link';
+import { StaffEditRow } from './StaffEditRow';
+import { ServiceEditRow } from './ServiceEditRow';
 
 export default async function SettingsPage({
   params,
@@ -70,19 +72,9 @@ export default async function SettingsPage({
       {/* ── Staff ── */}
       <section style={{ marginBottom: '2rem' }}>
         <h2>Staff ({staffList.length})</h2>
-        <ul>
+        <ul style={{ padding: 0, listStyle: 'none' }}>
           {staffList.map((s) => (
-            <li key={s.id} style={{ display: 'flex', gap: '1rem', padding: '0.25rem 0' }}>
-              <span>{s.name} {s.role ? `(${s.role})` : ''}</span>
-              <form
-                action={async () => {
-                  'use server';
-                  await deleteStaff(s.id);
-                }}
-              >
-                <button type="submit">Remove</button>
-              </form>
-            </li>
+            <StaffEditRow key={s.id} staff={s} />
           ))}
         </ul>
         <form
@@ -103,19 +95,9 @@ export default async function SettingsPage({
       {/* ── Services ── */}
       <section>
         <h2>Services ({servicesList.length})</h2>
-        <ul>
+        <ul style={{ padding: 0, listStyle: 'none' }}>
           {servicesList.map((s) => (
-            <li key={s.id} style={{ display: 'flex', gap: '1rem', padding: '0.25rem 0' }}>
-              <span>{s.name} — {s.duration_minutes}min — ₹{s.price}</span>
-              <form
-                action={async () => {
-                  'use server';
-                  await deleteService(s.id);
-                }}
-              >
-                <button type="submit">Remove</button>
-              </form>
-            </li>
+            <ServiceEditRow key={s.id} service={s} />
           ))}
         </ul>
         <form

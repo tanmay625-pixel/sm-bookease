@@ -90,20 +90,33 @@ export async function verifyOtp(
 
   if (!salon) return { ok: false, error: 'Salon not found' };
 
-  const valid = await verifyStoredOtp(salon.id, phone, code);
+  // verifyStoredOtp can throw if Supabase is unreachable
+  let valid: boolean;
+  try {
+    valid = await verifyStoredOtp(salon.id, phone, code);
+  } catch {
+    return { ok: false, error: 'Verification failed — please try again' };
+  }
+
   if (!valid) return { ok: false, error: 'Invalid or expired code' };
 
-  // Sign the session cookie
-  const token = await signSessionCookie(salon.id, phone);
-  const cookieStore = await cookies();
-
-  cookieStore.set(SESSION_COOKIE_NAME, token, {
-    httpOnly: true,
-    secure: process.env.NODE_ENV === 'production',
-    sameSite: 'lax',
-    maxAge: SESSION_COOKIE_MAX_AGE,
-    path: `/${salonSlug}`, // scope to this salon's path tree
-  });
+  // signSessionCookie uses jose which can throw DOMException for key issues.
+  // cookieStore.set can throw in some Next.js execution contexts.
+  // Neither must escape the server action boundary — wrap both.
+  try {
+    const token = await signSessionCookie(salon.id, phone);
+    const cookieStore = await cookies();
+    cookieStore.set(SESSION_COOKIE_NAME, token, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: 'lax',
+      maxAge: SESSION_COOKIE_MAX_AGE,
+      path: `/${salonSlug}`, // scope to this salon's path tree
+    });
+  } catch (err) {
+    console.error('[verifyOtp] Failed to sign or set session cookie:', err);
+    return { ok: false, error: 'Failed to create session — please try again' };
+  }
 
   return { ok: true };
 }
