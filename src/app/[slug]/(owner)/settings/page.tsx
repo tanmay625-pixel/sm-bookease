@@ -11,6 +11,7 @@ import { Label } from '@/components/ui/label';
 import { Button } from '@/components/ui/button';
 import { Separator } from '@/components/ui/separator';
 import { Building2, Users, Scissors } from 'lucide-react';
+import { ModeToggle } from '@/components/ui/theme-toggle';
 
 const DAYS = [
   { key: 'mon', label: 'Mon' },
@@ -88,7 +89,7 @@ export default async function SettingsPage({
             }}
           >
             <div className="flex flex-col gap-1.5">
-              <Label htmlFor="salon-name" className="text-xs">Salon name</Label>
+              <Label htmlFor="salon-name" className="text-xs">Studio name</Label>
               <Input
                 id="salon-name"
                 name="name"
@@ -123,6 +124,8 @@ export default async function SettingsPage({
                   </label>
                 ))}
               </div>
+              <Label className="text-xs">Toggle Theme</Label>
+              <ModeToggle />
             </div>
 
             <Button type="submit" size="sm" className="self-start">Save changes</Button>

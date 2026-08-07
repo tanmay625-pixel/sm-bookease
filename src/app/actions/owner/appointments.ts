@@ -174,13 +174,23 @@ export async function updateAppointmentDetails(
   // 1. Fetch appointment to verify existence & get salon_id
   const { data: existingData, error: fetchErr } = await supabase
     .from('appointments')
-    .select('id, salon_id, service_id, status')
+    .select('id, salon_id, service_id, status, slot_start')
     .eq('id', input.appointmentId)
     .single();
 
-  const existing = existingData as Pick<AppointmentRow, 'id' | 'salon_id' | 'service_id' | 'status'> | null;
+  const existing = existingData as Pick<AppointmentRow, 'id' | 'salon_id' | 'service_id' | 'status' | 'slot_start'> | null;
   if (fetchErr || !existing) {
     throw new Error('Appointment not found');
+  }
+
+  // Reject editing past appointments
+  if (new Date(existing.slot_start).getTime() <= Date.now()) {
+    throw new Error('Cannot edit past appointments.');
+  }
+
+  // Reject rescheduling to the past
+  if (new Date(input.slotStart).getTime() <= Date.now()) {
+    throw new Error('Cannot reschedule an appointment to a time in the past.');
   }
 
   // 2. Query salon staff

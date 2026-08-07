@@ -153,6 +153,11 @@ export function NewAppointmentModal({
       return;
     }
 
+    if (isEdit && appointment && new Date(appointment.slot_start).getTime() <= Date.now()) {
+      setError('Cannot edit past appointments.');
+      return;
+    }
+
     if (!isEdit && (!clientName || !clientPhone)) {
       setError('Client name and phone are required.');
       return;

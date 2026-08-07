@@ -321,7 +321,14 @@ export function WeekView({
 
   // ---- day column click (empty slot) ----------------------------------------
   const handleDayClick = useCallback(
-    (_dayDate: Date, _e: React.MouseEvent<HTMLDivElement>) => {
+    (dayDate: Date, _e: React.MouseEvent<HTMLDivElement>) => {
+      const todayStart = new Date();
+      todayStart.setHours(0, 0, 0, 0);
+      const clickedDay = new Date(dayDate);
+      clickedDay.setHours(0, 0, 0, 0);
+      if (clickedDay < todayStart) {
+        return;
+      }
       // Open modal in create mode — the user will select service/staff/date/time inside
       setModalAppointment(null);
       setModalOpen(true);
@@ -333,6 +340,10 @@ export function WeekView({
   const handleBlockClick = useCallback(
     (appt: AppointmentWithRelations, e: React.MouseEvent) => {
       e.stopPropagation(); // prevent day-column click
+      const isPast = new Date(appt.slot_start).getTime() <= Date.now();
+      if (isPast) {
+        return;
+      }
       setModalAppointment(appt);
       setModalOpen(true);
     },
@@ -550,14 +561,26 @@ export function WeekView({
                             end.getHours() * 60 + end.getMinutes(),
                           )}`;
 
+                          const isPast =
+                            new Date(appointment.slot_start).getTime() <=
+                            Date.now();
+
                           return (
                             <div
                               key={appointment.id}
                               className={cn(
-                                'absolute z-10 cursor-pointer overflow-hidden rounded-md border-l-[3px] px-1 py-0.5',
+                                'absolute z-10 overflow-hidden rounded-md border-l-[3px] px-1 py-0.5 transition-opacity',
+                                isPast
+                                  ? 'cursor-default opacity-75'
+                                  : 'cursor-pointer hover:opacity-90',
                                 sc.border,
                                 sc.bg,
                               )}
+                              title={
+                                isPast
+                                  ? 'Past appointment (read-only)'
+                                  : undefined
+                              }
                               style={{
                                 top,
                                 height,

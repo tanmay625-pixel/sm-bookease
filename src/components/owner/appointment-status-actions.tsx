@@ -28,6 +28,8 @@ export function AppointmentStatusActions({
 
   if (appointment.status === 'cancelled') return null;
 
+  const isPast = new Date(appointment.slot_start).getTime() <= Date.now();
+
   function handleConfirm() {
     startTransition(async () => {
       await updateAppointmentStatus(appointment.id, 'confirmed');
@@ -56,16 +58,18 @@ export function AppointmentStatusActions({
           </Button>
         )}
 
-        <Button
-          size="sm"
-          variant="outline"
-          onClick={() => setEditOpen(true)}
-          disabled={isPending}
-          className="h-7 gap-1 text-xs"
-        >
-          <Pencil className="size-3" />
-          Edit
-        </Button>
+        {!isPast && (
+          <Button
+            size="sm"
+            variant="outline"
+            onClick={() => setEditOpen(true)}
+            disabled={isPending}
+            className="h-7 gap-1 text-xs"
+          >
+            <Pencil className="size-3" />
+            Edit
+          </Button>
+        )}
 
         <Button
           size="sm"
