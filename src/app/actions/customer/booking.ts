@@ -1,9 +1,10 @@
 'use server';
 
 import { cookies } from 'next/headers';
+import { revalidatePath } from 'next/cache';
 import { createServiceSupabaseClient } from '@/lib/supabase/service';
 import { verifySessionCookie } from '@/lib/otp';
-import type { Database, SalonRow, ServiceRow } from '@/lib/supabase/types';
+import type { Database, SalonRow, ServiceRow, StaffRow } from '@/lib/supabase/types';
 
 const SESSION_COOKIE_NAME = 'bookease_session';
 
@@ -42,7 +43,9 @@ async function requireCustomerSession(salonSlug: string) {
 // ─────────────────────────────────────────────
 // getAvailableSlots
 // Computes free slots for a given date based on working hours minus
-// existing pending/confirmed appointments for the requested staff member.
+// existing pending/confirmed appointments.
+// When 'any' is selected, a slot is available if at least one staff member is free.
+// When date is today, excludes slots whose start time has already passed.
 // ─────────────────────────────────────────────
 
 export async function getAvailableSlots(
@@ -83,13 +86,17 @@ export async function getAvailableSlots(
   }
 
   const wh = salon.working_hours as { start: string; end: string };
-  const [startHour, startMin] = wh.start.split(':').map(Number);
-  const [endHour, endMin] = wh.end.split(':').map(Number);
-
   const dayStart = new Date(`${date}T${wh.start}:00`);
   const dayEnd = new Date(`${date}T${wh.end}:00`);
 
-  // Fetch existing appointments for this staff (or all staff if 'any') on this date
+  // Fetch all staff members for the salon
+  const { data: staffData } = await supabase
+    .from('staff')
+    .select('id')
+    .eq('salon_id', salon.id);
+  const salonStaff = (staffData ?? []) as Pick<StaffRow, 'id'>[];
+
+  // Fetch existing appointments on this date
   const startOfDay = `${date}T00:00:00+00:00`;
   const endOfDay = `${date}T23:59:59+00:00`;
 
@@ -112,24 +119,53 @@ export async function getAvailableSlots(
     staff_id: string | null;
   }>;
 
-  // Build set of busy intervals
-  const busyIntervals = existingAppointments.map((a) => ({
-    start: new Date(a.slot_start).getTime(),
-    end: new Date(a.slot_end).getTime(),
-  }));
-
   // Generate candidate slots every (duration_minutes) from dayStart to dayEnd
   const slots: { slotStart: string; slotEnd: string }[] = [];
   const duration = service.duration_minutes * 60 * 1_000;
   let cursor = dayStart.getTime();
+  const nowTime = Date.now();
 
   while (cursor + duration <= dayEnd.getTime()) {
     const slotEnd = cursor + duration;
 
-    // Check for overlap with any busy interval
-    const isBlocked = busyIntervals.some(
-      (b) => cursor < b.end && slotEnd > b.start
-    );
+    // BUG 3 Fix: If slot start time is already in the past (e.g. today at 1pm, 9am is past), skip it
+    if (cursor <= nowTime) {
+      cursor += duration;
+      continue;
+    }
+
+    // Check availability
+    let isBlocked = false;
+
+    if (staffIdOrAny !== 'any') {
+      // Specific staff selected: blocked if that staff has an overlapping appointment
+      isBlocked = existingAppointments.some(
+        (a) => cursor < new Date(a.slot_end).getTime() && slotEnd > new Date(a.slot_start).getTime()
+      );
+    } else {
+      // 'any' staff selected:
+      if (salonStaff.length > 0) {
+        // Find which staff members are busy during this slot
+        const busyStaffIds = new Set<string>();
+        for (const appt of existingAppointments) {
+          const apptStart = new Date(appt.slot_start).getTime();
+          const apptEnd = new Date(appt.slot_end).getTime();
+          if (cursor < apptEnd && slotEnd > apptStart && appt.staff_id) {
+            busyStaffIds.add(appt.staff_id);
+          }
+        }
+        // Blocked only if all staff members are busy
+        const availableStaffCount = salonStaff.filter((s) => !busyStaffIds.has(s.id)).length;
+        if (availableStaffCount === 0) {
+          isBlocked = true;
+        }
+      } else {
+        // No staff configured in salon: check for any overlapping appointment
+        isBlocked = existingAppointments.some(
+          (a) => cursor < new Date(a.slot_end).getTime() && slotEnd > new Date(a.slot_start).getTime()
+        );
+      }
+    }
 
     if (!isBlocked) {
       slots.push({
@@ -141,18 +177,13 @@ export async function getAvailableSlots(
     cursor += duration;
   }
 
-  // Suppress unused variable warnings
-  void startHour; void startMin; void endHour; void endMin;
-
   return slots;
 }
 
 // ─────────────────────────────────────────────
 // createAppointmentAsCustomer
 // Requires a valid session cookie.
-// Upserts the customer record, then re-checks slot availability
-// inside a serialised insert to handle the race condition where two
-// customers book the same slot simultaneously.
+// Automatically assigns an available staff member if 'any' or omitted.
 // ─────────────────────────────────────────────
 
 type CreateBookingInput = {
@@ -182,58 +213,81 @@ export async function createAppointmentAsCustomer(
   const slotStart = new Date(input.slotStart);
   const slotEnd = new Date(slotStart.getTime() + service.duration_minutes * 60 * 1_000);
 
-  // ── Race-condition guard ──────────────────────────────────────────────────
-  // Re-check the slot isn't taken (the brief window between getAvailableSlots
-  // returning and the user submitting can allow two concurrent bookings).
-  let conflictQuery = supabase
+  // Fetch all staff for this salon
+  const { data: staffData } = await supabase
+    .from('staff')
+    .select('id, name')
+    .eq('salon_id', salon.id)
+    .order('created_at', { ascending: true });
+  const salonStaff = (staffData ?? []) as Pick<StaffRow, 'id' | 'name'>[];
+
+  // Fetch conflicting appointments in the requested slot
+  const { data: conflictsData } = await supabase
     .from('appointments')
-    .select('id')
+    .select('id, staff_id')
     .eq('salon_id', salon.id)
     .in('status', ['pending', 'confirmed'])
     .lt('slot_start', slotEnd.toISOString())
     .gt('slot_end', slotStart.toISOString());
 
-  if (input.staffId) {
-    conflictQuery = conflictQuery.eq('staff_id', input.staffId);
-  }
+  const conflicts = (conflictsData ?? []) as Array<{ id: string; staff_id: string | null }>;
+  const busyStaffIds = new Set(conflicts.map((c) => c.staff_id).filter(Boolean) as string[]);
 
-  const { data: conflictsData } = await conflictQuery;
-  const conflicts = (conflictsData ?? []) as Array<{ id: string }>;
-  if (conflicts.length > 0) {
-    throw new Error('This slot was just booked by someone else — please pick another');
-  }
+  let assignedStaffId: string | null = null;
 
-  // ── Upsert customer record ────────────────────────────────────────────────
-  // We don't have the customer's name at OTP time — use phone as placeholder
-  // if it's a first visit. The UI should collect the name before booking.
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const { data: customerData, error: customerError } = await (supabase as any)
-    .from('customers')
-    .upsert(
-      { salon_id: salon.id, phone: session.phone, name: session.phone, email: null },
-      { onConflict: 'salon_id,phone', ignoreDuplicates: true }
-    )
-    .select()
-    .single() as { data: CustomerRow | null; error: { message: string } | null };
-  const customer = customerData;
-
-  // If upsert returned nothing (ignoreDuplicates on existing row), fetch explicitly
-  let resolvedCustomer: CustomerRow;
-  if (customer) {
-    resolvedCustomer = customer;
-  } else {
-    const { data: existingData, error: fetchErr } = await supabase
-      .from('customers')
-      .select('*')
-      .eq('salon_id', salon.id)
-      .eq('phone', session.phone)
-      .single();
-    const existing = existingData as CustomerRow | null;
-
-    if (fetchErr || !existing) {
-      throw new Error(`Failed to resolve customer: ${customerError?.message ?? fetchErr?.message}`);
+  if (input.staffId && input.staffId !== 'any') {
+    // Customer picked a specific staff member
+    if (busyStaffIds.has(input.staffId)) {
+      throw new Error('This staff member was just booked for this slot — please pick another slot or staff member');
     }
-    resolvedCustomer = existing;
+    assignedStaffId = input.staffId;
+  } else {
+    // Customer picked 'any' or omitted staff — assign the first available staff member
+    if (salonStaff.length > 0) {
+      const freeStaff = salonStaff.find((s) => !busyStaffIds.has(s.id));
+      if (!freeStaff) {
+        throw new Error('This slot was just booked by someone else — please pick another slot');
+      }
+      assignedStaffId = freeStaff.id;
+    } else {
+      // No staff in database for this salon (e.g. single operator without staff records)
+      if (conflicts.length > 0) {
+        throw new Error('This slot was just booked by someone else — please pick another slot');
+      }
+      assignedStaffId = null;
+    }
+  }
+
+  // ── Resolve / Upsert customer record ──────────────────────────────────────
+  // Fetch existing customer first to preserve name if already set
+  const { data: existingCustomer } = await supabase
+    .from('customers')
+    .select('*')
+    .eq('salon_id', salon.id)
+    .eq('phone', session.phone)
+    .single();
+
+  let resolvedCustomer: CustomerRow;
+
+  if (existingCustomer) {
+    resolvedCustomer = existingCustomer as CustomerRow;
+  } else {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const { data: newCustomer, error: insertErr } = await (supabase as any)
+      .from('customers')
+      .insert({
+        salon_id: salon.id,
+        phone: session.phone,
+        name: session.phone,
+        email: null,
+      })
+      .select()
+      .single() as { data: CustomerRow | null; error: { message: string } | null };
+
+    if (insertErr || !newCustomer) {
+      throw new Error(`Failed to create customer: ${insertErr?.message ?? 'unknown'}`);
+    }
+    resolvedCustomer = newCustomer;
   }
 
   // ── Insert appointment ────────────────────────────────────────────────────
@@ -244,7 +298,7 @@ export async function createAppointmentAsCustomer(
       salon_id: salon.id,
       customer_id: resolvedCustomer.id,
       service_id: input.serviceId,
-      staff_id: input.staffId ?? null,
+      staff_id: assignedStaffId,
       slot_start: slotStart.toISOString(),
       slot_end: slotEnd.toISOString(),
       status: 'pending',
@@ -259,7 +313,59 @@ export async function createAppointmentAsCustomer(
     throw new Error(`Failed to create appointment: ${apptError?.message ?? 'unknown'}`);
   }
 
+  revalidatePath(`/${salonSlug}/history`, 'page');
   return appointment;
+}
+
+// ─────────────────────────────────────────────
+// cancelOwnAppointment
+// Allows a signed-in customer to cancel an upcoming appointment that belongs to their phone number.
+// ─────────────────────────────────────────────
+
+export async function cancelOwnAppointment(
+  salonSlug: string,
+  appointmentId: string
+): Promise<{ ok: boolean; error?: string }> {
+  const { session, salon, supabase } = await requireCustomerSession(salonSlug);
+
+  // Fetch the appointment and joined customer to verify ownership
+  const { data: apptData, error: fetchErr } = await supabase
+    .from('appointments')
+    .select('*, customers(*)')
+    .eq('id', appointmentId)
+    .eq('salon_id', salon.id)
+    .single();
+
+  const appointment = apptData as (AppointmentRow & { customers: CustomerRow | null }) | null;
+
+  if (fetchErr || !appointment) {
+    return { ok: false, error: 'Appointment not found' };
+  }
+
+  // Verify the customer's phone matches the session
+  if (appointment.customers?.phone !== session.phone) {
+    return { ok: false, error: 'Unauthorized to cancel this appointment' };
+  }
+
+  if (appointment.status === 'cancelled') {
+    return { ok: true };
+  }
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const { error: updateErr } = await (supabase as any)
+    .from('appointments')
+    .update({ status: 'cancelled' })
+    .eq('id', appointmentId);
+
+  if (updateErr) {
+    return { ok: false, error: `Failed to cancel appointment: ${updateErr.message}` };
+  }
+
+  revalidatePath(`/${salonSlug}/history`, 'page');
+  revalidatePath(`/${salonSlug}/appointments`, 'page');
+  revalidatePath(`/${salonSlug}/dashboard`, 'page');
+
+  return { ok: true };
 }
 
 // ─────────────────────────────────────────────
@@ -268,7 +374,7 @@ export async function createAppointmentAsCustomer(
 // ─────────────────────────────────────────────
 
 export async function listMyAppointments(salonSlug: string): Promise<
-  (AppointmentRow & { services: ServiceRow | null })[]
+  (AppointmentRow & { services: ServiceRow | null; staff: StaffRow | null })[]
 > {
   const { session, salon, supabase } = await requireCustomerSession(salonSlug);
 
@@ -285,10 +391,10 @@ export async function listMyAppointments(salonSlug: string): Promise<
 
   const { data, error } = await supabase
     .from('appointments')
-    .select('*, services(*)')
+    .select('*, services(*), staff(*)')
     .eq('customer_id', customer.id)
     .order('slot_start', { ascending: false });
 
   if (error) throw new Error(`Failed to load appointments: ${error.message}`);
-  return (data ?? []) as (AppointmentRow & { services: ServiceRow | null })[];
+  return (data ?? []) as (AppointmentRow & { services: ServiceRow | null; staff: StaffRow | null })[];
 }

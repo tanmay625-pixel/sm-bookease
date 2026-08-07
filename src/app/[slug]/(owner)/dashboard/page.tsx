@@ -1,8 +1,12 @@
 import { createClerkSupabaseClient } from '@/lib/supabase/server';
 import { listAppointments } from '@/app/actions/owner/appointments';
-import { UserButton } from '@clerk/nextjs';
+import { listStaff } from '@/app/actions/owner/staff';
+import { listServices } from '@/app/actions/owner/services';
 import type { SalonRow } from '@/lib/supabase/types';
-import Link from 'next/link';
+import { TokenStubCard } from '@/components/token-stub-card';
+import { AppointmentStatusActions } from '@/components/owner/appointment-status-actions';
+import { NewAppointmentTrigger } from './NewAppointmentTrigger';
+import { CalendarDays, Clock, Users, XCircle } from 'lucide-react';
 
 export default async function DashboardPage({
   params,
@@ -20,46 +24,111 @@ export default async function DashboardPage({
   const salon = salonData as SalonRow | null;
 
   const today = new Date().toISOString().split('T')[0];
-  const appointments = salon
-    ? await listAppointments(salon.id, {
-        dateFrom: `${today}T00:00:00`,
-        dateTo: `${today}T23:59:59`,
-      })
-    : [];
+
+  const [todayAppts, weekAppts, staff, services] = salon
+    ? await Promise.all([
+        listAppointments(salon.id, {
+          dateFrom: `${today}T00:00:00`,
+          dateTo:   `${today}T23:59:59`,
+        }),
+        listAppointments(salon.id, {
+          dateFrom: `${today}T00:00:00`,
+          dateTo:   (() => {
+            const d = new Date();
+            d.setDate(d.getDate() + 7);
+            return d.toISOString().split('T')[0] + 'T23:59:59';
+          })(),
+        }),
+        listStaff(salon.id),
+        listServices(salon.id),
+      ])
+    : [[], [], [], []];
+
+  const pending   = todayAppts.filter((a) => a.status === 'pending');
+  const cancelled = todayAppts.filter((a) => a.status === 'cancelled');
+
+  const statCards = [
+    { label: "Today's Appointments", value: todayAppts.length, icon: CalendarDays, color: 'text-primary' },
+    { label: 'This Week',             value: weekAppts.length,  icon: Clock,        color: 'text-sky-600' },
+    { label: 'Pending Today',         value: pending.length,    icon: Users,        color: 'text-amber-600' },
+    { label: 'Cancelled Today',       value: cancelled.length,  icon: XCircle,      color: 'text-rose-600' },
+  ];
 
   return (
-    <main style={{ padding: '2rem', fontFamily: 'sans-serif' }}>
-      <header style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-        <h1>{salon?.name ?? slug} — Dashboard</h1>
-        <UserButton />
-      </header>
+    <div className="p-4 md:p-6 flex flex-col gap-6">
+      {/* Header */}
+      <div className="flex items-center justify-between gap-4">
+        <div>
+          <h1 className="text-xl font-semibold tracking-tight">Dashboard</h1>
+          <p className="text-xs text-muted-foreground mt-0.5">
+            {new Date().toLocaleDateString('en-IN', { weekday: 'long', day: 'numeric', month: 'long' })}
+          </p>
+        </div>
+        {salon && (
+          <NewAppointmentTrigger
+            salonId={salon.id}
+            salonSlug={slug}
+            staff={staff}
+            services={services}
+          />
+        )}
+      </div>
 
-      <nav style={{ margin: '1rem 0', display: 'flex', gap: '1rem' }}>
-        <Link href={`/${slug}/appointments`}>Appointments</Link>
-        <Link href={`/${slug}/clients`}>Clients</Link>
-        <Link href={`/${slug}/settings`}>Settings</Link>
-      </nav>
+      {/* Stat cards */}
+      <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
+        {statCards.map(({ label, value, icon: Icon, color }) => (
+          <div
+            key={label}
+            className="rounded-xl border border-border bg-card p-4 shadow-sm flex flex-col gap-2"
+          >
+            <div className="flex items-center justify-between">
+              <p className="text-xs text-muted-foreground">{label}</p>
+              <Icon className={`size-4 ${color}`} />
+            </div>
+            <p className="text-2xl font-bold tracking-tight">{value}</p>
+          </div>
+        ))}
+      </div>
 
+      {/* Today's appointments */}
       <section>
-        <h2>Today&apos;s Appointments ({appointments.length})</h2>
-        {appointments.length === 0 ? (
-          <p>No appointments today.</p>
+        <h2 className="text-sm font-semibold mb-3">
+          Today&apos;s Appointments
+          {todayAppts.length > 0 && (
+            <span className="ml-2 text-xs font-normal text-muted-foreground">
+              ({todayAppts.length})
+            </span>
+          )}
+        </h2>
+
+        {todayAppts.length === 0 ? (
+          <div className="rounded-xl border border-dashed border-border p-8 text-center">
+            <p className="text-sm text-muted-foreground">
+              No appointments today — they&apos;ll show up here as customers book.
+            </p>
+          </div>
         ) : (
-          <ul>
-            {appointments.map((a) => (
-              <li key={a.id}>
-                {new Date(a.slot_start).toLocaleTimeString()} —{' '}
-                {a.customers?.name ?? 'Unknown'} ({a.status})
-              </li>
+          <div className="flex flex-col gap-3">
+            {todayAppts.map((a) => (
+              <TokenStubCard
+                key={a.id}
+                appointment={a}
+                actions={
+                  salon && a.status !== 'cancelled' ? (
+                    <AppointmentStatusActions
+                      appointment={a}
+                      slug={slug}
+                      salonId={salon.id}
+                      staff={staff}
+                      services={services}
+                    />
+                  ) : undefined
+                }
+              />
             ))}
-          </ul>
+          </div>
         )}
       </section>
-
-      {/* Placeholder for real-time day schedule — UI component goes here */}
-      <section style={{ marginTop: '2rem', padding: '1rem', border: '1px dashed #ccc' }}>
-        <p>[Day schedule calendar — v0 component slot]</p>
-      </section>
-    </main>
+    </div>
   );
 }

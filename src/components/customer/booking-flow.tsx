@@ -1,0 +1,557 @@
+'use client';
+
+import { useState, useTransition, useCallback } from 'react';
+import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
+import { Skeleton } from '@/components/ui/skeleton';
+import { getAvailableSlots, createAppointmentAsCustomer } from '@/app/actions/customer/booking';
+import { TokenStubCard } from '@/components/token-stub-card';
+import type { ServiceRow, StaffRow, AppointmentRow } from '@/lib/supabase/types';
+import {
+  Scissors,
+  User,
+  CalendarDays,
+  Clock,
+  CheckCircle2,
+  ChevronLeft,
+  CalendarPlus,
+} from 'lucide-react';
+import Link from 'next/link';
+import { cn } from '@/lib/utils';
+
+type Slot = { slotStart: string; slotEnd: string };
+
+interface BookingFlowProps {
+  slug: string;
+  services: ServiceRow[];
+  staff: StaffRow[];
+  isSignedIn: boolean;
+  initialParams?: {
+    serviceId?: string;
+    staffId?: string;
+    date?: string;
+    slotStart?: string;
+    slotEnd?: string;
+  };
+}
+
+type Step = 1 | 2 | 3 | 4;
+
+const STEPS = [
+  { id: 1, label: 'Service', icon: Scissors },
+  { id: 2, label: 'Staff',   icon: User },
+  { id: 3, label: 'Time',    icon: CalendarDays },
+  { id: 4, label: 'Confirm', icon: CheckCircle2 },
+] as const;
+
+export function BookingFlow({
+  slug,
+  services,
+  staff,
+  isSignedIn,
+  initialParams,
+}: BookingFlowProps) {
+  const today = new Date().toISOString().split('T')[0];
+
+  // Resolve initial state if restored from sign-in redirection
+  const initService = initialParams?.serviceId
+    ? services.find((s) => s.id === initialParams.serviceId) ?? null
+    : null;
+
+  const initStaff = initialParams?.staffId
+    ? initialParams.staffId === 'any'
+      ? 'any'
+      : staff.find((st) => st.id === initialParams.staffId) ?? 'any'
+    : 'any';
+
+  const initDate = initialParams?.date || today;
+
+  const initSlot: Slot | null = initialParams?.slotStart
+    ? { slotStart: initialParams.slotStart, slotEnd: initialParams.slotEnd || '' }
+    : null;
+
+  const initStep: Step = initService && initSlot ? 4 : 1;
+
+  const [step, setStep] = useState<Step>(initStep);
+  const [selectedService, setSelectedService] = useState<ServiceRow | null>(initService);
+  const [selectedStaff, setSelectedStaff] = useState<StaffRow | null | 'any'>(initStaff);
+  const [date, setDate] = useState<string>(initDate);
+  const [slots, setSlots] = useState<Slot[]>([]);
+  const [selectedSlot, setSelectedSlot] = useState<Slot | null>(initSlot);
+  const [loadingSlots, setLoadingSlots] = useState(false);
+  const [slotError, setSlotError] = useState<string | null>(null);
+  const [bookingPending, startBooking] = useTransition();
+  const [booked, setBooked] = useState<AppointmentRow | null>(null);
+  const [bookingError, setBookingError] = useState<string | null>(null);
+
+  // Load slots when entering step 3
+  const loadSlots = useCallback(
+    async (serviceId: string, staffIdOrAny: string, d: string) => {
+      setLoadingSlots(true);
+      setSlotError(null);
+      setSelectedSlot(null);
+      try {
+        const result = await getAvailableSlots(slug, serviceId, staffIdOrAny, d);
+        setSlots(result);
+        if (result.length === 0) {
+          setSlotError('No available slots on this date — try another day.');
+        }
+      } catch {
+        setSlotError('Could not load slots. Please try again.');
+        setSlots([]);
+      } finally {
+        setLoadingSlots(false);
+      }
+    },
+    [slug]
+  );
+
+  function goToStep3() {
+    if (!selectedService) return;
+    const staffId = selectedStaff === 'any' || !selectedStaff
+      ? 'any'
+      : selectedStaff.id;
+    loadSlots(selectedService.id, staffId, date);
+    setStep(3);
+  }
+
+  function handleDateChange(newDate: string) {
+    setDate(newDate);
+    if (!selectedService) return;
+    const staffId = selectedStaff === 'any' || !selectedStaff
+      ? 'any'
+      : selectedStaff.id;
+    loadSlots(selectedService.id, staffId, newDate);
+  }
+
+  function handleConfirm() {
+    if (!selectedService || !selectedSlot) return;
+    if (!isSignedIn) return; // UI already shows sign-in prompt
+
+    setBookingError(null);
+    startBooking(async () => {
+      try {
+        const appt = await createAppointmentAsCustomer(slug, {
+          serviceId: selectedService.id,
+          staffId:
+            selectedStaff === 'any' || !selectedStaff
+              ? undefined
+              : selectedStaff.id,
+          slotStart: selectedSlot.slotStart,
+        });
+        setBooked(appt);
+      } catch (err) {
+        setBookingError(
+          err instanceof Error ? err.message : 'Booking failed — please try again.'
+        );
+      }
+    });
+  }
+
+  // Build sign-in link that carries in-progress booking selection (Bug 6 Fix)
+  const signInParams = new URLSearchParams();
+  if (selectedService) signInParams.set('serviceId', selectedService.id);
+  if (selectedStaff) {
+    signInParams.set('staffId', selectedStaff === 'any' ? 'any' : selectedStaff.id);
+  }
+  if (date) signInParams.set('date', date);
+  if (selectedSlot) {
+    signInParams.set('slotStart', selectedSlot.slotStart);
+    signInParams.set('slotEnd', selectedSlot.slotEnd);
+  }
+  const signInHref = `/${slug}/sign-in?${signInParams.toString()}`;
+
+  // ── Success state ────────────────────────────────────────────────────────
+  if (booked) {
+    const bookedAppt: AppointmentRow = booked;
+    // Build a relation-enriched version for TokenStubCard
+    const enriched = {
+      ...bookedAppt,
+      services: selectedService ?? undefined,
+      customers: null,
+      staff: selectedStaff ? staff.find((s) => s.id === selectedStaff) ?? null : null,
+    };
+    return (
+      <div className="flex flex-col items-center gap-6 px-4 py-8 text-center">
+        <div className="flex h-16 w-16 items-center justify-center rounded-full bg-emerald-100 dark:bg-emerald-950/40">
+          <CheckCircle2 className="size-8 text-emerald-600 dark:text-emerald-400" />
+        </div>
+        <div>
+          <h2 className="text-lg font-semibold">You&apos;re booked!</h2>
+          <p className="text-sm text-muted-foreground mt-1">
+            Your appointment is scheduled below.
+          </p>
+        </div>
+        <TokenStubCard appointment={enriched} className="w-full max-w-sm" />
+        <div className="flex flex-col gap-2 w-full max-w-sm">
+          <Button variant="outline" asChild className="gap-2">
+            <Link href={`/${slug}/history`}>
+              <CalendarPlus className="size-4" />
+              View my appointments
+            </Link>
+          </Button>
+          <Button
+            variant="ghost"
+            onClick={() => {
+              setBooked(null);
+              setStep(1);
+              setSelectedService(null);
+              setSelectedStaff('any');
+              setSelectedSlot(null);
+            }}
+          >
+            Book another
+          </Button>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="flex flex-col min-h-[calc(100vh-8rem)]">
+      {/* ── Progress bar ────────────────────────────────────────── */}
+      <div className="border-b border-border bg-background/50 px-4 py-3">
+        <div className="flex items-center justify-between max-w-md mx-auto">
+          {STEPS.map(({ id, label, icon: Icon }) => {
+            const isDone = step > id;
+            const isCurrent = step === id;
+            return (
+              <div key={id} className="flex items-center gap-1.5">
+                <button
+                  type="button"
+                  disabled={id > step}
+                  onClick={() => id < step && setStep(id as Step)}
+                  className={cn(
+                    'flex h-7 w-7 items-center justify-center rounded-full text-xs font-semibold transition-colors',
+                    isDone && 'bg-primary text-primary-foreground cursor-pointer',
+                    isCurrent && 'bg-primary text-primary-foreground ring-2 ring-primary ring-offset-2 ring-offset-background',
+                    !isDone && !isCurrent && 'bg-muted text-muted-foreground cursor-not-allowed'
+                  )}
+                  aria-label={`Step ${id}: ${label}`}
+                >
+                  {isDone ? <CheckCircle2 className="size-3.5" /> : id}
+                </button>
+                <span
+                  className={cn(
+                    'hidden sm:inline text-xs font-medium',
+                    isCurrent && 'text-foreground',
+                    !isCurrent && 'text-muted-foreground'
+                  )}
+                >
+                  {label}
+                </span>
+                {id < 4 && (
+                  <div
+                    className={cn(
+                      'h-0.5 w-6 sm:w-10 ml-1.5 transition-colors',
+                      isDone ? 'bg-primary' : 'bg-muted'
+                    )}
+                  />
+                )}
+              </div>
+            );
+          })}
+        </div>
+      </div>
+
+      {/* ── Back button (if past step 1) ────────────────────────── */}
+      {step > 1 && (
+        <div className="px-4 pt-3">
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => setStep((s) => (s - 1) as Step)}
+            className="gap-1 text-xs text-muted-foreground hover:text-foreground h-8 px-2"
+          >
+            <ChevronLeft className="size-4" />
+            Back
+          </Button>
+        </div>
+      )}
+
+      {/* ── Step 1: Select Service ──────────────────────────────── */}
+      {step === 1 && (
+        <div className="flex-1 p-4 max-w-md mx-auto w-full">
+          <h2 className="text-sm font-semibold mb-1">Select a service</h2>
+          <p className="text-xs text-muted-foreground mb-4">
+            Choose what you&apos;d like to book today.
+          </p>
+
+          {services.length === 0 ? (
+            <div className="rounded-xl border border-border p-8 text-center text-sm text-muted-foreground">
+              No services available at this salon currently.
+            </div>
+          ) : (
+            <div className="flex flex-col gap-2.5">
+              {services.map((svc) => {
+                const isSelected = selectedService?.id === svc.id;
+                return (
+                  <button
+                    key={svc.id}
+                    type="button"
+                    onClick={() => setSelectedService(svc)}
+                    className={cn(
+                      'flex items-center justify-between rounded-xl border p-4 text-left transition-all',
+                      'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
+                      isSelected
+                        ? 'border-primary bg-primary/5 shadow-xs'
+                        : 'border-border bg-card hover:border-border/80 hover:bg-accent/40'
+                    )}
+                  >
+                    <div className="flex flex-col gap-1">
+                      <span className="font-medium text-sm text-foreground">{svc.name}</span>
+                      <span className="text-xs text-muted-foreground flex items-center gap-1">
+                        <Clock className="size-3" />
+                        {svc.duration_minutes} mins
+                      </span>
+                    </div>
+                    <div className="flex items-center gap-3">
+                      <span className="font-semibold text-sm text-foreground">₹{svc.price}</span>
+                      {isSelected && (
+                        <CheckCircle2 className="size-4 text-primary shrink-0" />
+                      )}
+                    </div>
+                  </button>
+                );
+              })}
+            </div>
+          )}
+
+          <div className="mt-6">
+            <Button
+              className="w-full"
+              disabled={!selectedService}
+              onClick={() => setStep(2)}
+            >
+              Continue to Staff →
+            </Button>
+          </div>
+        </div>
+      )}
+
+      {/* ── Step 2: Select Staff ────────────────────────────────── */}
+      {step === 2 && (
+        <div className="flex-1 p-4 max-w-md mx-auto w-full">
+          <h2 className="text-sm font-semibold mb-1">Choose staff member</h2>
+          <p className="text-xs text-muted-foreground mb-4">
+            Select a preferred stylist or pick any available.
+          </p>
+
+          <div className="flex flex-col gap-2.5">
+            {/* Any Available option */}
+            <button
+              type="button"
+              onClick={() => setSelectedStaff('any')}
+              className={cn(
+                'flex items-center gap-3 rounded-xl border p-4 text-left transition-all',
+                'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
+                selectedStaff === 'any'
+                  ? 'border-primary bg-primary/5 shadow-xs'
+                  : 'border-border bg-card hover:bg-accent/40'
+              )}
+            >
+              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-primary/10 text-primary">
+                <Scissors className="size-5" />
+              </div>
+              <div className="flex-1">
+                <p className="text-sm font-medium">Any Available</p>
+                <p className="text-xs text-muted-foreground">
+                  First available staff member
+                </p>
+              </div>
+              {selectedStaff === 'any' && (
+                <CheckCircle2 className="size-4 text-primary shrink-0" />
+              )}
+            </button>
+
+            {/* Named staff */}
+            {staff.map((st) => {
+              const isSelected =
+                selectedStaff !== 'any' && selectedStaff?.id === st.id;
+              return (
+                <button
+                  key={st.id}
+                  type="button"
+                  onClick={() => setSelectedStaff(st)}
+                  className={cn(
+                    'flex items-center gap-3 rounded-xl border p-4 text-left transition-all',
+                    'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
+                    isSelected
+                      ? 'border-primary bg-primary/5 shadow-xs'
+                      : 'border-border bg-card hover:bg-accent/40'
+                  )}
+                >
+                  <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-muted text-muted-foreground text-sm font-semibold">
+                    {st.name.slice(0, 2).toUpperCase()}
+                  </div>
+                  <div className="flex-1">
+                    <p className="text-sm font-medium">{st.name}</p>
+                    {st.role && (
+                      <p className="text-xs text-muted-foreground">{st.role}</p>
+                    )}
+                  </div>
+                  {isSelected && (
+                    <CheckCircle2 className="size-4 text-primary shrink-0" />
+                  )}
+                </button>
+              );
+            })}
+          </div>
+
+          <div className="mt-6">
+            <Button className="w-full" onClick={goToStep3}>
+              Continue to Time →
+            </Button>
+          </div>
+        </div>
+      )}
+
+      {/* ── Step 3: Date & Time ─────────────────────────────────── */}
+      {step === 3 && (
+        <div className="flex-1 p-4 max-w-md mx-auto w-full">
+          <h2 className="text-sm font-semibold mb-1">Pick date & time</h2>
+          <p className="text-xs text-muted-foreground mb-4">
+            Available slots for {selectedService?.name}
+          </p>
+
+          {/* Date Picker Input */}
+          <div className="mb-4">
+            <label className="text-xs font-medium text-muted-foreground block mb-1.5">
+              Select date
+            </label>
+            <input
+              type="date"
+              value={date}
+              min={today}
+              onChange={(e) => handleDateChange(e.target.value)}
+              className="w-full rounded-lg border border-input bg-background px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-ring"
+            />
+          </div>
+
+          {/* Slots grid */}
+          {loadingSlots ? (
+            <div className="grid grid-cols-3 gap-2">
+              {Array.from({ length: 9 }).map((_, i) => (
+                <Skeleton key={i} className="h-10 rounded-lg" />
+              ))}
+            </div>
+          ) : slotError ? (
+            <div className="rounded-xl border border-border p-6 text-center text-xs text-muted-foreground">
+              {slotError}
+            </div>
+          ) : (
+            <div className="grid grid-cols-3 gap-2">
+              {slots.map((slot) => {
+                const isSelected = selectedSlot?.slotStart === slot.slotStart;
+                const timeLabel = new Date(slot.slotStart).toLocaleTimeString([], {
+                  hour: '2-digit',
+                  minute: '2-digit',
+                });
+                return (
+                  <button
+                    key={slot.slotStart}
+                    type="button"
+                    onClick={() => setSelectedSlot(slot)}
+                    className={cn(
+                      'flex items-center justify-center rounded-lg border py-2.5 px-1 text-xs font-medium transition-all',
+                      'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
+                      isSelected
+                        ? 'border-primary bg-primary text-primary-foreground font-semibold shadow-xs'
+                        : 'border-border bg-card text-foreground hover:border-primary/50 hover:bg-accent/40'
+                    )}
+                  >
+                    {timeLabel}
+                  </button>
+                );
+              })}
+            </div>
+          )}
+
+          <div className="mt-6">
+            <Button
+              className="w-full"
+              disabled={!selectedSlot}
+              onClick={() => setStep(4)}
+            >
+              Continue to Confirm →
+            </Button>
+          </div>
+        </div>
+      )}
+
+      {/* ── Step 4: Summary & Confirm ───────────────────────────── */}
+      {step === 4 && (
+        <div className="flex-1 p-4 max-w-md mx-auto w-full">
+          <h2 className="text-sm font-semibold mb-4">Confirm your booking</h2>
+
+          {/* Summary */}
+          <div className="rounded-xl border border-border bg-card p-4 flex flex-col gap-3 mb-4">
+            <div className="flex justify-between text-sm">
+              <span className="text-muted-foreground">Service</span>
+              <span className="font-medium">{selectedService?.name}</span>
+            </div>
+            <div className="flex justify-between text-sm">
+              <span className="text-muted-foreground">Duration</span>
+              <span className="font-medium">{selectedService?.duration_minutes} min</span>
+            </div>
+            <div className="flex justify-between text-sm">
+              <span className="text-muted-foreground">Staff</span>
+              <span className="font-medium">
+                {selectedStaff === 'any' ? 'Any available' : (selectedStaff as StaffRow)?.name}
+              </span>
+            </div>
+            <div className="flex justify-between text-sm">
+              <span className="text-muted-foreground">Date</span>
+              <span className="font-medium">
+                {new Date(date).toLocaleDateString('en-IN', {
+                  weekday: 'short', day: 'numeric', month: 'short', year: 'numeric'
+                })}
+              </span>
+            </div>
+            <div className="flex justify-between text-sm">
+              <span className="text-muted-foreground">Time</span>
+              <span className="font-medium">
+                {selectedSlot && new Date(selectedSlot.slotStart).toLocaleTimeString([], {
+                  hour: '2-digit', minute: '2-digit'
+                })}
+                {selectedSlot && ' – '}
+                {selectedSlot && new Date(selectedSlot.slotEnd).toLocaleTimeString([], {
+                  hour: '2-digit', minute: '2-digit'
+                })}
+              </span>
+            </div>
+            <div className="flex justify-between text-sm font-semibold border-t border-border pt-3 mt-1">
+              <span>Total</span>
+              <span className="text-primary">₹{selectedService?.price}</span>
+            </div>
+          </div>
+
+          {bookingError && (
+            <p className="mb-3 rounded-md border border-destructive/30 bg-destructive/5 px-3 py-2 text-xs text-destructive">
+              {bookingError}
+            </p>
+          )}
+
+          {!isSignedIn ? (
+            <div className="flex flex-col gap-3">
+              <p className="text-sm text-muted-foreground text-center">
+                Sign in to confirm this booking.
+              </p>
+              <Button asChild>
+                <Link href={signInHref}>Sign in with phone →</Link>
+              </Button>
+            </div>
+          ) : (
+            <Button
+              className="w-full"
+              onClick={handleConfirm}
+              disabled={bookingPending}
+            >
+              {bookingPending ? 'Booking…' : 'Book Appointment'}
+            </Button>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}

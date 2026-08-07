@@ -1,0 +1,93 @@
+'use client';
+
+import { useState, useTransition } from 'react';
+import { Button } from '@/components/ui/button';
+import { updateAppointmentStatus } from '@/app/actions/owner/appointments';
+import { NewAppointmentModal } from '@/components/owner/new-appointment-modal';
+import type { StaffRow, ServiceRow } from '@/lib/supabase/types';
+import type { AppointmentWithRelations } from '@/components/token-stub-card';
+import { CheckCircle, XCircle, Pencil } from 'lucide-react';
+
+interface AppointmentStatusActionsProps {
+  appointment: AppointmentWithRelations;
+  slug: string;
+  salonId: string;
+  staff: StaffRow[];
+  services: ServiceRow[];
+}
+
+export function AppointmentStatusActions({
+  appointment,
+  slug,
+  salonId,
+  staff,
+  services,
+}: AppointmentStatusActionsProps) {
+  const [isPending, startTransition] = useTransition();
+  const [editOpen, setEditOpen] = useState(false);
+
+  if (appointment.status === 'cancelled') return null;
+
+  function handleConfirm() {
+    startTransition(async () => {
+      await updateAppointmentStatus(appointment.id, 'confirmed');
+    });
+  }
+
+  function handleCancel() {
+    startTransition(async () => {
+      await updateAppointmentStatus(appointment.id, 'cancelled');
+    });
+  }
+
+  return (
+    <>
+      <div className="flex flex-wrap items-center gap-1.5">
+        {appointment.status === 'pending' && (
+          <Button
+            size="sm"
+            variant="default"
+            onClick={handleConfirm}
+            disabled={isPending}
+            className="h-7 gap-1 text-xs"
+          >
+            <CheckCircle className="size-3" />
+            Confirm
+          </Button>
+        )}
+
+        <Button
+          size="sm"
+          variant="outline"
+          onClick={() => setEditOpen(true)}
+          disabled={isPending}
+          className="h-7 gap-1 text-xs"
+        >
+          <Pencil className="size-3" />
+          Edit
+        </Button>
+
+        <Button
+          size="sm"
+          variant="ghost"
+          onClick={handleCancel}
+          disabled={isPending}
+          className="h-7 gap-1 text-xs text-destructive hover:bg-destructive/10 hover:text-destructive"
+        >
+          <XCircle className="size-3" />
+          Cancel
+        </Button>
+      </div>
+
+      <NewAppointmentModal
+        open={editOpen}
+        onOpenChange={setEditOpen}
+        salonId={salonId}
+        salonSlug={slug}
+        staff={staff}
+        services={services}
+        appointment={appointment}
+      />
+    </>
+  );
+}

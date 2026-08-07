@@ -1,0 +1,44 @@
+'use client';
+
+import { useState } from 'react';
+import { Button } from '@/components/ui/button';
+import { NewAppointmentModal } from '@/components/owner/new-appointment-modal';
+import type { StaffRow, ServiceRow } from '@/lib/supabase/types';
+import { Plus } from 'lucide-react';
+
+interface NewAppointmentTriggerProps {
+  salonId: string;
+  salonSlug: string;
+  staff: StaffRow[];
+  services: ServiceRow[];
+}
+
+export function NewAppointmentTrigger({
+  salonId,
+  salonSlug,
+  staff,
+  services,
+}: NewAppointmentTriggerProps) {
+  const [open, setOpen] = useState(false);
+
+  return (
+    <>
+      <Button
+        id="new-appointment-btn"
+        onClick={() => setOpen(true)}
+        className="gap-1.5 shrink-0"
+      >
+        <Plus className="size-4" />
+        New Appointment
+      </Button>
+      <NewAppointmentModal
+        open={open}
+        onOpenChange={setOpen}
+        salonId={salonId}
+        salonSlug={salonSlug}
+        staff={staff}
+        services={services}
+      />
+    </>
+  );
+}
