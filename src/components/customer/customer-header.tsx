@@ -30,7 +30,7 @@ export function CustomerHeader({ slug, phone }: CustomerHeaderProps) {
         <div className="flex h-6 w-6 items-center justify-center rounded-md bg-primary text-primary-foreground">
           <Scissors className="size-3.5" />
         </div>
-        <span className="text-sm font-semibold text-foreground">BookEase</span>
+        <span className="text-sm font-semibold text-foreground">BookMi</span>
       </Link>
 
       {phone ? (

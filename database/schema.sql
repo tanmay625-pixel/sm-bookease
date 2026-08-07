@@ -1,5 +1,5 @@
 -- ============================================================
--- BookEase — Supabase Schema
+-- BookMi — Supabase Schema
 -- Run in Supabase SQL editor. Read every RLS policy before executing.
 -- ============================================================
 

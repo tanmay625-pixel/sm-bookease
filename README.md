@@ -1,4 +1,4 @@
-# BookEase
+# BookMi
 
 Multi-tenant salon appointment booking PWA. Next.js 16 (App Router) + Supabase + Clerk + Serwist.
 

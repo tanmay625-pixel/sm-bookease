@@ -31,7 +31,7 @@ export default async function OnboardingPage() {
 
   return (
     <main style={{ padding: '2rem', maxWidth: '480px', fontFamily: 'sans-serif' }}>
-      <h1>Welcome to BookEase</h1>
+      <h1>Welcome to BookMi</h1>
       <p>Set up your salon to get started. Your unique booking link will be generated automatically.</p>
 
       <form action={handleCreateSalon} style={{ marginTop: '1.5rem' }}>

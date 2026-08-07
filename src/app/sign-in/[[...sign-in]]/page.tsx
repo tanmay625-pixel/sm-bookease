@@ -10,7 +10,7 @@ export default function SignInPage() {
           <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary text-primary-foreground">
             <Scissors className="size-4" />
           </div>
-          <span className="text-base font-bold tracking-tight">BookEase</span>
+          <span className="text-base font-bold tracking-tight">BookMi</span>
         </Link>
         <span className="text-xs text-muted-foreground">Owner Portal</span>
       </header>
@@ -29,7 +29,7 @@ export default function SignInPage() {
 
       <footer className="border-t border-border bg-background/50 py-4 text-center text-xs text-muted-foreground">
         <div className="flex items-center justify-center gap-4">
-          <span>&copy; {new Date().getFullYear()} BookEase</span>
+          <span>&copy; {new Date().getFullYear()} BookMi</span>
           <span>·</span>
           <Link href="/cookies" className="hover:text-foreground transition-colors">
             Cookie Policy

@@ -6,7 +6,7 @@ import { createServiceSupabaseClient } from '@/lib/supabase/service';
 import { verifySessionCookie } from '@/lib/otp';
 import type { Database, SalonRow, ServiceRow, StaffRow } from '@/lib/supabase/types';
 
-const SESSION_COOKIE_NAME = 'bookease_session';
+const SESSION_COOKIE_NAME = 'bookmi_session';
 
 type AppointmentRow = Database['public']['Tables']['appointments']['Row'];
 type CustomerRow = Database['public']['Tables']['customers']['Row'];

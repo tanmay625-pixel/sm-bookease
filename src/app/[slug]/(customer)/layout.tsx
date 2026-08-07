@@ -19,7 +19,7 @@ export default async function CustomerLayout({
   const { slug } = await params;
 
   const cookieStore = await cookies();
-  const token = cookieStore.get('bookease_session')?.value;
+  const token = cookieStore.get('bookmi_session')?.value;
   const session = token ? await verifySessionCookie(token) : null;
 
   return (

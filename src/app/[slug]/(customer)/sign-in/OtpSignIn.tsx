@@ -153,7 +153,7 @@ function OtpSignInContent({ slug }: OtpSignInProps) {
           {step === 'name' ? <UserCheck className="size-6" /> : <Scissors className="size-6" />}
         </div>
         <h1 className="text-xl font-semibold tracking-tight">
-          {step === 'name' ? 'Welcome to BookEase!' : 'Sign in'}
+          {step === 'name' ? 'Welcome to BookMi!' : 'Sign in'}
         </h1>
         <p className="text-xs text-muted-foreground text-center">
           {step === 'phone'

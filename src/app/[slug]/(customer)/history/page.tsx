@@ -21,7 +21,7 @@ export default async function HistoryPage({
 
   // Redirect to sign-in if no session
   const cookieStore = await cookies();
-  const token = cookieStore.get('bookease_session')?.value;
+  const token = cookieStore.get('bookmi_session')?.value;
   const session = token ? await verifySessionCookie(token) : null;
 
   if (!session) {

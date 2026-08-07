@@ -25,7 +25,7 @@ export default async function BookPage({
 
   // Determine if the customer is signed in (no redirect — sign-in is optional until submit)
   const cookieStore = await cookies();
-  const token = cookieStore.get('bookease_session')?.value;
+  const token = cookieStore.get('bookmi_session')?.value;
   const session = token ? await verifySessionCookie(token) : null;
   const isSignedIn = Boolean(session);
 

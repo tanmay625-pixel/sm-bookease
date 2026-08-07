@@ -7,7 +7,7 @@ import { generateOtp, storeOtp, verifyStoredOtp, signSessionCookie, verifySessio
 import { sendWhatsAppMessage } from '@/lib/whatsapp';
 import type { SalonRow, CustomerRow } from '@/lib/supabase/types';
 
-const SESSION_COOKIE_NAME = 'bookease_session';
+const SESSION_COOKIE_NAME = 'bookmi_session';
 const SESSION_COOKIE_MAX_AGE = 60 * 60 * 24 * 7; // 7 days in seconds
 
 // ─────────────────────────────────────────────
@@ -51,7 +51,7 @@ export async function requestOtp(
   // TODO: confirm exact template name once approved by Meta
   const { success, error: waError } = await sendWhatsAppMessage(
     phone,
-    'bookease_otp', // TODO: confirm exact template name once approved
+    'bookmi_otp', // TODO: confirm exact template name once approved
     'en',
     [code],
     salon.id

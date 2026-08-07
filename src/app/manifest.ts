@@ -2,8 +2,8 @@ import type { MetadataRoute } from 'next';
 
 export default function manifest(): MetadataRoute.Manifest {
   return {
-    name: 'BookEase',
-    short_name: 'BookEase',
+    name: 'BookMi',
+    short_name: 'BookMi',
     description: 'Salon appointment booking — scan, book, done.',
     start_url: '/',
     display: 'standalone',

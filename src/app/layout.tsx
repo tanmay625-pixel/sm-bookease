@@ -18,7 +18,7 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "BookEase — Salon Booking",
+  title: "BookMi — Salon Booking",
   description: "Multi-tenant salon appointment booking. Scan, book, done.",
 };
 

@@ -3,8 +3,8 @@ import { Scissors, ArrowLeft, ShieldCheck, Cookie } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
 export const metadata = {
-  title: "Cookie Policy — BookEase",
-  description: "Learn how BookEase uses cookies to power secure salon bookings and authentication.",
+  title: "Cookie Policy — BookMi",
+  description: "Learn how BookMi uses cookies to power secure salon bookings and authentication.",
 };
 
 export default function CookiesPage() {
@@ -15,7 +15,7 @@ export default function CookiesPage() {
           <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary text-primary-foreground">
             <Scissors className="size-4" />
           </div>
-          <span className="text-base font-bold tracking-tight">BookEase</span>
+          <span className="text-base font-bold tracking-tight">BookMi</span>
         </Link>
         <Button variant="ghost" size="sm" asChild className="gap-1 text-xs">
           <Link href="/">
@@ -51,14 +51,14 @@ export default function CookiesPage() {
           <section className="space-y-3">
             <h2 className="text-base font-semibold text-foreground">2. Cookies We Use</h2>
             <p>
-              BookEase uses strictly necessary cookies required for the platform to operate. We do not use third-party advertising or cross-site tracking cookies.
+              BookMi uses strictly necessary cookies required for the platform to operate. We do not use third-party advertising or cross-site tracking cookies.
             </p>
 
             <div className="grid gap-3 pt-2">
               <div className="rounded-xl border border-border bg-card p-4">
                 <div className="flex items-center gap-2 text-foreground font-medium text-sm">
                   <ShieldCheck className="size-4 text-primary" />
-                  <span>Customer Authentication Cookie (`bookease_session`)</span>
+                  <span>Customer Authentication Cookie (`bookmi_session`)</span>
                 </div>
                 <p className="mt-1 text-xs text-muted-foreground">
                   A secure, encrypted, HTTP-only session cookie created when you sign in via phone OTP. It enables you to view appointment history and book slots without re-entering your phone number on every interaction.
@@ -87,7 +87,7 @@ export default function CookiesPage() {
           <section className="space-y-3">
             <h2 className="text-base font-semibold text-foreground">4. Contact</h2>
             <p>
-              If you have any questions about our use of cookies, please contact your salon administrator or reach out to the BookEase support team.
+              If you have any questions about our use of cookies, please contact your salon administrator or reach out to the BookMi support team.
             </p>
           </section>
         </div>
@@ -95,7 +95,7 @@ export default function CookiesPage() {
 
       <footer className="border-t border-border bg-background/50 py-6 text-center text-xs text-muted-foreground">
         <div className="flex items-center justify-center gap-4">
-          <span>&copy; {new Date().getFullYear()} BookEase</span>
+          <span>&copy; {new Date().getFullYear()} BookMi</span>
           <span>·</span>
           <span>All rights reserved</span>
         </div>
