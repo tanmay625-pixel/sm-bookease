@@ -125,7 +125,7 @@ export default async function SettingsPage({
                 ))}
               </div>
               <Label className="text-xs">Toggle Theme</Label>
-              <ModeToggle />
+              <ModeToggle /> 
             </div>
 
             <Button type="submit" size="sm" className="self-start">Save changes</Button>
