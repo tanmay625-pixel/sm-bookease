@@ -17,6 +17,14 @@ const serwist = new Serwist({
   clientsClaim: true,
   navigationPreload: true,
   runtimeCaching: [
+    // Network-first for navigation requests (HTML pages) — always go to server
+    {
+      matcher: ({ request }) => request.mode === 'navigate',
+      handler: new NetworkFirst({
+        cacheName: 'pages-cache',
+        networkTimeoutSeconds: 5,
+      }),
+    },
     // Network-first for API and server action routes (fresh data matters)
     {
       matcher: /^\/api\//,
