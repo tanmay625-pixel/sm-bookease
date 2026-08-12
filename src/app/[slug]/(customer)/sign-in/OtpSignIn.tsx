@@ -48,12 +48,24 @@ function OtpSignInContent({ slug }: OtpSignInProps) {
     return paramsString ? `/${slug}/book?${paramsString}` : `/${slug}/book`;
   }, [slug, searchParams]);
 
+  /** Only allow digits, cap at 10 chars */
+  function handlePhoneChange(e: React.ChangeEvent<HTMLInputElement>) {
+    const digits = e.target.value.replace(/\D/g, '').slice(0, 10);
+    setPhone(digits);
+  }
+
+  /** Full E.164 number sent to the server */
+  const fullPhone = `91${phone}`;
+
   function handleSendOtp(e: React.FormEvent) {
     e.preventDefault();
-    if (!phone) return;
+    if (phone.length !== 10) {
+      setError('Please enter a valid 10-digit mobile number');
+      return;
+    }
     setError(null);
     startTransition(async () => {
-      const result = await requestOtp(slug, phone);
+      const result = await requestOtp(slug, fullPhone);
       if (!result.ok) {
         setError(result.error ?? 'Failed to send OTP');
         return;
@@ -68,7 +80,7 @@ function OtpSignInContent({ slug }: OtpSignInProps) {
     setError(null);
     setOtp(Array(OTP_LENGTH).fill(''));
     startTransition(async () => {
-      const result = await requestOtp(slug, phone);
+      const result = await requestOtp(slug, fullPhone);
       if (!result.ok) {
         setError(result.error ?? 'Failed to resend OTP');
         return;
@@ -110,7 +122,7 @@ function OtpSignInContent({ slug }: OtpSignInProps) {
   function doVerify(code: string) {
     setError(null);
     startTransition(async () => {
-      const result = await verifyOtp(slug, phone, code);
+      const result = await verifyOtp(slug, fullPhone, code);
       if (!result.ok) {
         setError(result.error ?? 'Verification failed');
         setOtp(Array(OTP_LENGTH).fill(''));
@@ -159,7 +171,7 @@ function OtpSignInContent({ slug }: OtpSignInProps) {
           {step === 'phone'
             ? 'Enter your mobile number to get a one-time code'
             : step === 'otp'
-            ? `Code sent to ${phone}`
+            ? `Code sent to +91 ${phone}`
             : 'Please enter your name to complete your profile'}
         </p>
       </div>
@@ -169,16 +181,23 @@ function OtpSignInContent({ slug }: OtpSignInProps) {
         <form onSubmit={handleSendOtp} className="flex flex-col gap-3">
           <div className="flex flex-col gap-1.5">
             <Label htmlFor="phone-input" className="text-xs">Mobile number</Label>
-            <Input
-              id="phone-input"
-              type="tel"
-              value={phone}
-              onChange={(e) => setPhone(e.target.value)}
-              placeholder="91XXXXXXXXXX"
-              required
-              autoFocus
-              inputMode="numeric"
-            />
+            <div className="flex items-center gap-0">
+              <span className="inline-flex h-9 items-center rounded-l-md border border-r-0 border-input bg-muted px-3 text-sm text-muted-foreground select-none">
+                +91
+              </span>
+              <Input
+                id="phone-input"
+                type="tel"
+                value={phone}
+                onChange={handlePhoneChange}
+                placeholder="9876543210"
+                required
+                autoFocus
+                inputMode="numeric"
+                maxLength={10}
+                className="rounded-l-none"
+              />
+            </div>
           </div>
           {error && (
             <p className="rounded-md border border-destructive/30 bg-destructive/5 px-3 py-2 text-xs text-destructive">

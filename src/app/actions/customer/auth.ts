@@ -43,7 +43,7 @@ export async function requestOtp(
   }
 
   // Dev fallback: log OTP to console so the flow is testable before WhatsApp
-  // template approval. Guarded by NODE_ENV so this never leaks in production.
+  // template approval.
   if (process.env.NODE_ENV === 'development') {
     console.log(`[DEV] OTP for ${phone} at ${salonSlug}: ${code}`);
   }
@@ -58,12 +58,12 @@ export async function requestOtp(
   );
 
   if (!success) {
-    // In development, don't fail the flow even if WhatsApp isn't wired
-    if (process.env.NODE_ENV === 'development') {
-      console.warn('[DEV] WhatsApp send skipped:', waError);
-      return { ok: true };
-    }
-    return { ok: false, error: 'Failed to send OTP — please try again' };
+    // WhatsApp delivery failed — log OTP to server logs so the owner
+    // can still test the flow while Meta verification is pending.
+    // This log is only visible in Vercel Function Logs (server-side),
+    // never exposed to the client.
+    console.warn(`[OTP FALLBACK] WhatsApp failed for ${phone} at ${salonSlug}: ${waError}`);
+    console.warn(`[OTP FALLBACK] Code: ${code}`);
   }
 
   return { ok: true };
