@@ -18,8 +18,8 @@ export function OnboardingForm({ action }: { action: (formData: FormData) => Pro
     startTransition(async () => {
       try {
         await action(formData);
-      } catch (err: any) {
-        setError(err.message || 'An error occurred');
+      } catch (err: unknown) {
+        setError(err instanceof Error ? err.message : 'An error occurred');
       }
     });
   }
