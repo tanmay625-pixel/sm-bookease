@@ -153,7 +153,7 @@ export default async function SettingsPage({
               await createStaff(salon.id, {
                 name:  formData.get('name')  as string,
                 role:  (formData.get('role')  as string) || null,
-                email: (formData.get('email') as string) || null,
+                email: (formData.get('contact') as string) || null,
                 phone: null,
               });
             }}
@@ -165,7 +165,7 @@ export default async function SettingsPage({
               <Input name="name"  placeholder="Name *" required />
               <Input name="role"  placeholder="Role (optional)" />
             </div>
-            <Input name="email" type="email" placeholder="Email (optional)" />
+            <Input name="contact" type="contact" placeholder="Contact (optional)" />
             <Button type="submit" size="sm" className="self-start">Add Staff</Button>
           </form>
         </TabsContent>

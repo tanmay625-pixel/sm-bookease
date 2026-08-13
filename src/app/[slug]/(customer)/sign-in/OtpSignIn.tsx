@@ -182,7 +182,7 @@ function OtpSignInContent({ slug }: OtpSignInProps) {
           <div className="flex flex-col gap-1.5">
             <Label htmlFor="phone-input" className="text-xs">Mobile number</Label>
             <div className="flex items-center gap-0">
-              <span className="inline-flex h-9 items-center rounded-l-md border border-r-0 border-input bg-muted px-3 text-sm text-muted-foreground select-none">
+              <span className="inline-flex h-7.5 items-center rounded-l-md border border-r-0 border-input bg-muted px-3 text-sm text-muted-foreground select-none">
                 +91
               </span>
               <Input
