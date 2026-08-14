@@ -249,7 +249,7 @@ function OtpSignInContent({ slug }: OtpSignInProps) {
             </p>
           )}
 
-          <Button type="submit" className="w-full" disabled={isPending || otp.some((d) => !d)}>
+          <Button type="submit" className="w-full" disabled={otp.some((d) => !d)}>
             {isPending ? 'Verifying…' : 'Verify →'}
           </Button>
 
