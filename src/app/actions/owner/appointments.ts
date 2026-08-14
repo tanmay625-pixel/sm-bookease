@@ -14,6 +14,7 @@ export type AppointmentWithRelations = AppointmentRow & {
   customers: CustomerRow | null;
   services: ServiceRow | null;
   staff: StaffRow | null;
+  appointment_services?: { services: ServiceRow | null }[];
 };
 
 async function requireAuth() {
@@ -43,7 +44,7 @@ export async function listAppointments(
 
   let query = supabase
     .from('appointments')
-    .select('*, customers(*), services(*), staff(*)')
+    .select('*, customers(*), services(*), staff(*), appointment_services(services(*))')
     .eq('salon_id', salonId)
     .order('slot_start', { ascending: true });
 
@@ -82,7 +83,7 @@ export async function listAppointments(
 type CreateAppointmentInput = {
   salonId: string;
   customerId: string;
-  serviceId: string;
+  serviceIds: string[];
   slotStart: string;   // ISO datetime string
   slotEnd: string;     // ISO datetime string
   staffId?: string;
@@ -132,7 +133,7 @@ export async function createAppointmentAsOwner(
     .insert({
       salon_id: input.salonId,
       customer_id: input.customerId,
-      service_id: input.serviceId,
+      service_id: input.serviceIds[0], // primary for backward compat
       slot_start: input.slotStart,
       slot_end: input.slotEnd,
       staff_id: assignedStaffId,
@@ -148,6 +149,21 @@ export async function createAppointmentAsOwner(
     throw new Error(`Failed to create appointment: ${error?.message ?? 'unknown'}`);
   }
 
+  // Insert into junction table
+  const appointmentServices = input.serviceIds.map((serviceId) => ({
+    appointment_id: data.id,
+    service_id: serviceId,
+  }));
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const { error: junctionError } = await (supabase as any)
+    .from('appointment_services')
+    .insert(appointmentServices);
+
+  if (junctionError) {
+    console.error('Failed to insert appointment_services:', junctionError);
+  }
+
   revalidatePath('/[slug]/(owner)/appointments', 'page');
   revalidatePath('/[slug]/(owner)/dashboard', 'page');
   return data;
@@ -159,10 +175,12 @@ export async function createAppointmentAsOwner(
 
 type UpdateAppointmentDetailsInput = {
   appointmentId: string;
-  staffId?: string;    // UUID or undefined (if 'any' or omitted)
-  slotStart: string;   // ISO datetime string
-  slotEnd: string;     // ISO datetime string
-  notes?: string;
+  salonId: string;
+  serviceIds?: string[];
+  slotStart?: string;
+  slotEnd?: string;
+  staffId?: string | null;
+  notes?: string | null;
 };
 
 export async function updateAppointmentDetails(
@@ -174,11 +192,11 @@ export async function updateAppointmentDetails(
   // 1. Fetch appointment to verify existence & get salon_id
   const { data: existingData, error: fetchErr } = await supabase
     .from('appointments')
-    .select('id, salon_id, service_id, status, slot_start')
+    .select('id, salon_id, service_id, status, slot_start, slot_end')
     .eq('id', input.appointmentId)
     .single();
 
-  const existing = existingData as Pick<AppointmentRow, 'id' | 'salon_id' | 'service_id' | 'status' | 'slot_start'> | null;
+  const existing = existingData as Pick<AppointmentRow, 'id' | 'salon_id' | 'service_id' | 'status' | 'slot_start' | 'slot_end'> | null;
   if (fetchErr || !existing) {
     throw new Error('Appointment not found');
   }
@@ -189,7 +207,7 @@ export async function updateAppointmentDetails(
   }
 
   // Reject rescheduling to the past
-  if (new Date(input.slotStart).getTime() <= Date.now()) {
+  if (input.slotStart && new Date(input.slotStart).getTime() <= Date.now()) {
     throw new Error('Cannot reschedule an appointment to a time in the past.');
   }
 
@@ -201,68 +219,86 @@ export async function updateAppointmentDetails(
     .order('created_at', { ascending: true });
   const salonStaff = (staffData ?? []) as { id: string; name: string }[];
 
-  // 3. Query conflicting appointments (excluding this appointment so it doesn't conflict with itself)
+  // 3. Query conflicting appointments
+  const slotStart = input.slotStart || existing.slot_start;
+  const slotEnd = input.slotEnd || existing.slot_end;
+
   const { data: conflictsData } = await supabase
     .from('appointments')
     .select('id, staff_id')
     .eq('salon_id', existing.salon_id)
     .neq('id', input.appointmentId)
     .in('status', ['pending', 'confirmed'])
-    .lt('slot_start', input.slotEnd)
-    .gt('slot_end', input.slotStart);
+    .lt('slot_start', slotEnd)
+    .gt('slot_end', slotStart);
 
   const conflicts = (conflictsData ?? []) as Array<{ id: string; staff_id: string | null }>;
   const busyStaffIds = new Set(conflicts.map((c) => c.staff_id).filter(Boolean) as string[]);
 
   let assignedStaffId: string | null = null;
 
-  if (input.staffId && input.staffId !== 'any') {
-    // Specific staff selected
-    if (busyStaffIds.has(input.staffId)) {
-      throw new Error('This staff member already has an appointment at this time — please choose a different time or staff member.');
-    }
-    assignedStaffId = input.staffId;
-  } else {
-    // 'any' staff selected — find first available staff member
-    if (salonStaff.length > 0) {
-      const freeStaff = salonStaff.find((s) => !busyStaffIds.has(s.id));
-      if (!freeStaff) {
-        throw new Error('All staff members are booked for this time slot — please choose another time.');
-      }
-      assignedStaffId = freeStaff.id;
+  if (input.staffId !== undefined) {
+    if (input.staffId && input.staffId !== 'any') {
+        if (busyStaffIds.has(input.staffId)) {
+          throw new Error('This staff member already has an appointment at this time — please choose a different time or staff member.');
+        }
+        assignedStaffId = input.staffId;
     } else {
-      if (conflicts.length > 0) {
-        throw new Error('This time slot is no longer available — please choose another time.');
-      }
-      assignedStaffId = null;
+        assignedStaffId = null;
     }
   }
 
   // 4. Update appointment
-  const updatePayload: Partial<AppointmentRow> = {
-    staff_id: assignedStaffId,
-    slot_start: input.slotStart,
-    slot_end: input.slotEnd,
-  };
-  if (input.notes !== undefined) {
-    updatePayload.notes = input.notes || null;
+  const updates: Partial<AppointmentRow> = {};
+  if (input.serviceIds && input.serviceIds.length > 0) {
+    updates.service_id = input.serviceIds[0];
   }
+  if (input.slotStart) updates.slot_start = input.slotStart;
+  if (input.slotEnd) updates.slot_end = input.slotEnd;
+  if (input.staffId !== undefined) updates.staff_id = assignedStaffId;
+  if (input.notes !== undefined) updates.notes = input.notes;
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const { data: updatedData, error: updateErr } = await (supabase as any)
+  const { error } = await (supabase as any)
     .from('appointments')
-    .update(updatePayload)
+    .update(updates)
+    .eq('id', input.appointmentId);
+
+  if (error) {
+    throw new Error(`Failed to update appointment: ${error.message}`);
+  }
+
+  // Update junction table if serviceIds provided
+  if (input.serviceIds && input.serviceIds.length > 0) {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    await (supabase as any)
+      .from('appointment_services')
+      .delete()
+      .eq('appointment_id', input.appointmentId);
+      
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    await (supabase as any)
+      .from('appointment_services')
+      .insert(input.serviceIds.map(sid => ({
+        appointment_id: input.appointmentId,
+        service_id: sid
+      })));
+  }
+
+  // Fetch updated data
+  const { data: updatedData, error: updatedFetchErr } = await supabase
+    .from('appointments')
+    .select('*, customers(*), services(*), staff(*), appointment_services(services(*))')
     .eq('id', input.appointmentId)
-    .select('*, customers(*), services(*), staff(*)')
     .single();
 
-  if (updateErr || !updatedData) {
-    throw new Error(`Failed to update appointment: ${updateErr?.message ?? 'unknown'}`);
+  if (updatedFetchErr || !updatedData) {
+    throw new Error(`Failed to fetch updated appointment: ${updatedFetchErr?.message}`);
   }
 
   revalidatePath('/[slug]/(owner)/appointments', 'page');
   revalidatePath('/[slug]/(owner)/dashboard', 'page');
-  return updatedData as AppointmentWithRelations;
+  return updatedData as unknown as AppointmentWithRelations;
 }
 
 /**
@@ -309,6 +345,7 @@ export async function updateAppointmentStatus(
         [
           customer.name,
           new Date(existing.slot_start).toLocaleString('en-IN', {
+            timeZone: 'Asia/Kolkata',
             dateStyle: 'medium',
             timeStyle: 'short',
           }),
@@ -359,7 +396,7 @@ export async function getClientDetail(clientId: string): Promise<
 
   const { data, error } = await supabase
     .from('customers')
-    .select('*, appointments(*, services(*), staff(*))')
+    .select('*, appointments(*, services(*), staff(*), appointment_services(services(*)))')
     .eq('id', clientId)
     .single();
 

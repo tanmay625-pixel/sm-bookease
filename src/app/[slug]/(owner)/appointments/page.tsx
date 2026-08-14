@@ -55,8 +55,8 @@ export default async function AppointmentsPage({
   const [appointments, staff, services] = salon
     ? await Promise.all([
         listAppointments(salon.id, {
-          dateFrom: sp.dateFrom ? `${sp.dateFrom}T00:00:00` : undefined,
-          dateTo:   sp.dateTo   ? `${sp.dateTo}T23:59:59`   : undefined,
+          dateFrom: sp.dateFrom ? `${sp.dateFrom}T00:00:00Z` : undefined,
+          dateTo:   sp.dateTo   ? `${sp.dateTo}T23:59:59Z`   : undefined,
           status:   statusFilter,
           staffId:  sp.staffId !== 'all' ? sp.staffId : undefined,
           search:   sp.search,

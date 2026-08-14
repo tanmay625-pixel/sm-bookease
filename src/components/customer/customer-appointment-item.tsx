@@ -15,10 +15,15 @@ import { cancelOwnAppointment } from '@/app/actions/customer/booking';
 import { useRouter } from 'next/navigation';
 import type { AppointmentRow, ServiceRow, StaffRow } from '@/lib/supabase/types';
 import { XCircle, AlertCircle } from 'lucide-react';
+import { formatISTTime, formatISTDate } from '@/lib/timezone';
 
 interface CustomerAppointmentItemProps {
   slug: string;
-  appointment: AppointmentRow & { services: ServiceRow | null; staff?: StaffRow | null };
+  appointment: AppointmentRow & { 
+    services: ServiceRow | null; 
+    staff?: StaffRow | null;
+    appointment_services?: { services: ServiceRow | null }[];
+  };
   isUpcoming?: boolean;
 }
 
@@ -32,15 +37,18 @@ export function CustomerAppointmentItem({
   const [error, setError] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
 
-  const formattedDate = new Date(appointment.slot_start).toLocaleDateString('en-IN', {
-    weekday: 'short',
-    day: 'numeric',
-    month: 'short',
-  });
-  const formattedTime = new Date(appointment.slot_start).toLocaleTimeString([], {
-    hour: '2-digit',
-    minute: '2-digit',
-  });
+  const formattedDate = formatISTDate(appointment.slot_start);
+  const formattedTime = formatISTTime(appointment.slot_start);
+
+  let serviceName = 'Service';
+  if (appointment.appointment_services && appointment.appointment_services.length > 0) {
+    serviceName = appointment.appointment_services
+      .map(as => as.services?.name)
+      .filter(Boolean)
+      .join(' + ');
+  } else if (appointment.services) {
+    serviceName = appointment.services.name;
+  }
 
   function handleConfirmCancel() {
     setError(null);
@@ -59,6 +67,7 @@ export function CustomerAppointmentItem({
     ...appointment,
     customers: null,
     services: appointment.services,
+    appointment_services: appointment.appointment_services,
     staff: appointment.staff ?? null,
   };
 
@@ -92,7 +101,7 @@ export function CustomerAppointmentItem({
             <DialogDescription className="text-xs text-muted-foreground">
               Are you sure you want to cancel your appointment for{' '}
               <span className="font-medium text-foreground">
-                {appointment.services?.name ?? 'Service'}
+                {serviceName}
               </span>{' '}
               on <span className="font-medium text-foreground">{formattedDate}</span> at{' '}
               <span className="font-medium text-foreground">{formattedTime}</span>?

@@ -4,6 +4,7 @@ import { listStaff } from '@/app/actions/owner/staff';
 import { listServices } from '@/app/actions/owner/services';
 import { getSalonBySlug } from '@/app/actions/owner/salon';
 import { WeekView } from '@/components/calendar/week-view';
+import { toIST, todayIST } from '@/lib/timezone';
 
 /**
  * Calendar page shell.
@@ -31,22 +32,23 @@ export default async function CalendarPage({
   }
 
   // Compute Monday of the current week (ISO week starts on Monday)
-  const now = new Date();
-  const dayOfWeek = now.getDay(); // 0=Sun … 6=Sat
+  const today = todayIST();
+  const now = toIST(today, '00:00');
+  const dayOfWeek = now.getUTCDay(); // 0=Sun … 6=Sat
   const mondayOffset = dayOfWeek === 0 ? -6 : 1 - dayOfWeek;
   const monday = new Date(now);
-  monday.setDate(now.getDate() + mondayOffset);
+  monday.setUTCDate(now.getUTCDate() + mondayOffset);
   const weekStartStr = monday.toISOString().split('T')[0];
 
   // Fetch a wider window (Mon–Sun) of appointments for the initial render
   const sunday = new Date(monday);
-  sunday.setDate(monday.getDate() + 6);
+  sunday.setUTCDate(monday.getUTCDate() + 6);
   const weekEndStr = sunday.toISOString().split('T')[0];
 
   const [appointments, staff, services] = await Promise.all([
     listAppointments(salon.id, {
-      dateFrom: `${weekStartStr}T00:00:00`,
-      dateTo: `${weekEndStr}T23:59:59`,
+      dateFrom: `${weekStartStr}T00:00:00Z`,
+      dateTo: `${weekEndStr}T23:59:59Z`,
     }),
     listStaff(salon.id),
     listServices(salon.id),

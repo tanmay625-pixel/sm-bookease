@@ -7,6 +7,7 @@ import { TokenStubCard } from '@/components/token-stub-card';
 import { AppointmentStatusActions } from '@/components/owner/appointment-status-actions';
 import { NewAppointmentTrigger } from './NewAppointmentTrigger';
 import { CalendarDays, Clock, Users, XCircle } from 'lucide-react';
+import { todayIST, formatISTDate, toIST } from '@/lib/timezone';
 
 export default async function DashboardPage({
   params,
@@ -23,20 +24,20 @@ export default async function DashboardPage({
     .single();
   const salon = salonData as SalonRow | null;
 
-  const today = new Date().toISOString().split('T')[0];
+  const today = todayIST();
 
   const [todayAppts, weekAppts, staff, services] = salon
     ? await Promise.all([
         listAppointments(salon.id, {
-          dateFrom: `${today}T00:00:00`,
-          dateTo:   `${today}T23:59:59`,
+          dateFrom: `${today}T00:00:00Z`,
+          dateTo:   `${today}T23:59:59Z`,
         }),
         listAppointments(salon.id, {
-          dateFrom: `${today}T00:00:00`,
+          dateFrom: `${today}T00:00:00Z`,
           dateTo:   (() => {
-            const d = new Date();
+            const d = toIST(today, '00:00');
             d.setDate(d.getDate() + 7);
-            return d.toISOString().split('T')[0] + 'T23:59:59';
+            return d.toISOString().split('T')[0] + 'T23:59:59Z';
           })(),
         }),
         listStaff(salon.id),
@@ -61,7 +62,7 @@ export default async function DashboardPage({
         <div>
           <h1 className="text-xl font-semibold tracking-tight">Dashboard</h1>
           <p className="text-xs text-muted-foreground mt-0.5">
-            {new Date().toLocaleDateString('en-IN', { weekday: 'long', day: 'numeric', month: 'long' })}
+            {formatISTDate(`${today}T00:00:00Z`, false)}
           </p>
         </div>
         {salon && (

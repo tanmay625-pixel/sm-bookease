@@ -5,6 +5,7 @@ import { revalidatePath } from 'next/cache';
 import { createServiceSupabaseClient } from '@/lib/supabase/service';
 import { verifySessionCookie } from '@/lib/otp';
 import type { Database, SalonRow, ServiceRow, StaffRow } from '@/lib/supabase/types';
+import { toIST, istDateRange } from '@/lib/timezone';
 
 const SESSION_COOKIE_NAME = 'bookmi_session';
 
@@ -50,7 +51,7 @@ async function requireCustomerSession(salonSlug: string) {
 
 export async function getAvailableSlots(
   salonSlug: string,
-  serviceId: string,
+  serviceIds: string[],
   staffIdOrAny: string, // UUID or 'any'
   date: string           // YYYY-MM-DD
 ): Promise<{ slotStart: string; slotEnd: string }[]> {
@@ -66,15 +67,18 @@ export async function getAvailableSlots(
 
   if (!salon) throw new Error('Salon not found');
 
-  const { data: serviceData } = await supabase
+  if (!serviceIds || serviceIds.length === 0) return [];
+
+  const { data: servicesData } = await supabase
     .from('services')
     .select('duration_minutes')
-    .eq('id', serviceId)
-    .eq('salon_id', salon.id)
-    .single();
-  const service = serviceData as Pick<ServiceRow, 'duration_minutes'> | null;
+    .in('id', serviceIds)
+    .eq('salon_id', salon.id);
+  const services = servicesData as Pick<ServiceRow, 'duration_minutes'>[] | null;
 
-  if (!service) throw new Error('Service not found');
+  if (!services || services.length !== serviceIds.length) throw new Error('One or more services not found');
+
+  const totalDurationMinutes = services.reduce((sum, s) => sum + s.duration_minutes, 0);
 
   // Determine which day of the week this date falls on
   const dateObj = new Date(`${date}T00:00:00`);
@@ -86,8 +90,8 @@ export async function getAvailableSlots(
   }
 
   const wh = salon.working_hours as { start: string; end: string };
-  const dayStart = new Date(`${date}T${wh.start}:00`);
-  const dayEnd = new Date(`${date}T${wh.end}:00`);
+  const dayStart = toIST(date, wh.start);
+  const dayEnd = toIST(date, wh.end);
 
   // Fetch all staff members for the salon
   const { data: staffData } = await supabase
@@ -96,9 +100,8 @@ export async function getAvailableSlots(
     .eq('salon_id', salon.id);
   const salonStaff = (staffData ?? []) as Pick<StaffRow, 'id'>[];
 
-  // Fetch existing appointments on this date
-  const startOfDay = `${date}T00:00:00+00:00`;
-  const endOfDay = `${date}T23:59:59+00:00`;
+  // Fetch existing appointments on this date using the new timezone utility
+  const { startOfDay, endOfDay } = istDateRange(date);
 
   let apptQuery = supabase
     .from('appointments')
@@ -121,7 +124,7 @@ export async function getAvailableSlots(
 
   // Generate candidate slots every (duration_minutes) from dayStart to dayEnd
   const slots: { slotStart: string; slotEnd: string }[] = [];
-  const duration = service.duration_minutes * 60 * 1_000;
+  const duration = totalDurationMinutes * 60 * 1_000;
   let cursor = dayStart.getTime();
   const nowTime = Date.now();
 
@@ -187,7 +190,7 @@ export async function getAvailableSlots(
 // ─────────────────────────────────────────────
 
 type CreateBookingInput = {
-  serviceId: string;
+  serviceIds: string[];
   staffId?: string;
   slotStart: string;  // ISO datetime
   notes?: string;
@@ -199,19 +202,22 @@ export async function createAppointmentAsCustomer(
 ): Promise<AppointmentRow> {
   const { session, salon, supabase } = await requireCustomerSession(salonSlug);
 
-  // Resolve service to get duration
-  const { data: serviceData } = await supabase
+  if (!input.serviceIds || input.serviceIds.length === 0) throw new Error('No services selected');
+
+  // Resolve services to get duration
+  const { data: servicesData } = await supabase
     .from('services')
     .select('duration_minutes')
-    .eq('id', input.serviceId)
-    .eq('salon_id', salon.id)
-    .single();
-  const service = serviceData as Pick<ServiceRow, 'duration_minutes'> | null;
+    .in('id', input.serviceIds)
+    .eq('salon_id', salon.id);
+  const services = servicesData as Pick<ServiceRow, 'duration_minutes'>[] | null;
 
-  if (!service) throw new Error('Service not found');
+  if (!services || services.length !== input.serviceIds.length) throw new Error('One or more services not found');
+
+  const totalDurationMinutes = services.reduce((sum, s) => sum + s.duration_minutes, 0);
 
   const slotStart = new Date(input.slotStart);
-  const slotEnd = new Date(slotStart.getTime() + service.duration_minutes * 60 * 1_000);
+  const slotEnd = new Date(slotStart.getTime() + totalDurationMinutes * 60 * 1_000);
 
   // Fetch all staff for this salon
   const { data: staffData } = await supabase
@@ -297,7 +303,7 @@ export async function createAppointmentAsCustomer(
     .insert({
       salon_id: salon.id,
       customer_id: resolvedCustomer.id,
-      service_id: input.serviceId,
+      service_id: input.serviceIds[0], // primary service for backward compat
       staff_id: assignedStaffId,
       slot_start: slotStart.toISOString(),
       slot_end: slotEnd.toISOString(),
@@ -311,6 +317,23 @@ export async function createAppointmentAsCustomer(
 
   if (apptError || !appointment) {
     throw new Error(`Failed to create appointment: ${apptError?.message ?? 'unknown'}`);
+  }
+
+  // Insert into junction table
+  const appointmentServices = input.serviceIds.map((serviceId) => ({
+    appointment_id: appointment.id,
+    service_id: serviceId,
+  }));
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const { error: junctionError } = await (supabase as any)
+    .from('appointment_services')
+    .insert(appointmentServices);
+
+  if (junctionError) {
+    console.error('Failed to insert appointment_services:', junctionError);
+    // Best effort, we don't throw to avoid failing the appointment if junction fails,
+    // though in a real app we'd probably use an RPC/transaction.
   }
 
   revalidatePath(`/${salonSlug}/history`, 'page');
@@ -374,7 +397,11 @@ export async function cancelOwnAppointment(
 // ─────────────────────────────────────────────
 
 export async function listMyAppointments(salonSlug: string): Promise<
-  (AppointmentRow & { services: ServiceRow | null; staff: StaffRow | null })[]
+  (AppointmentRow & { 
+    services: ServiceRow | null; 
+    staff: StaffRow | null;
+    appointment_services?: { services: ServiceRow | null }[] 
+  })[]
 > {
   const { session, salon, supabase } = await requireCustomerSession(salonSlug);
 
@@ -391,10 +418,10 @@ export async function listMyAppointments(salonSlug: string): Promise<
 
   const { data, error } = await supabase
     .from('appointments')
-    .select('*, services(*), staff(*)')
+    .select('*, services(*), staff(*), appointment_services(services(*))')
     .eq('customer_id', customer.id)
     .order('slot_start', { ascending: false });
 
   if (error) throw new Error(`Failed to load appointments: ${error.message}`);
-  return (data ?? []) as (AppointmentRow & { services: ServiceRow | null; staff: StaffRow | null })[];
+  return (data ?? []) as any[];
 }

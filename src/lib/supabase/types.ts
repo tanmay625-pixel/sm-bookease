@@ -140,6 +140,21 @@ export type Database = {
           Database['public']['Tables']['message_log']['Insert']
         >;
       };
+      appointment_services: {
+        Row: {
+          id: string;
+          appointment_id: string;
+          service_id: string;
+          created_at: string;
+        };
+        Insert: Omit<
+          Database['public']['Tables']['appointment_services']['Row'],
+          'id' | 'created_at'
+        >;
+        Update: Partial<
+          Database['public']['Tables']['appointment_services']['Insert']
+        >;
+      };
     };
     Views: Record<string, never>;
     Functions: Record<string, never>;
@@ -162,4 +177,5 @@ export type CustomerRow = Database['public']['Tables']['customers']['Row'];
 export type AppointmentRow = Database['public']['Tables']['appointments']['Row'];
 export type OtpCodeRow = Database['public']['Tables']['otp_codes']['Row'];
 export type MessageLogRow = Database['public']['Tables']['message_log']['Row'];
+export type AppointmentServiceRow = Database['public']['Tables']['appointment_services']['Row'];
 export type AppointmentStatus = Database['public']['Enums']['appointment_status'];

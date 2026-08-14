@@ -11,6 +11,7 @@ import {
 import type { StaffRow, ServiceRow, WorkingHours } from '@/lib/supabase/types';
 import { cn } from '@/lib/utils';
 import { ChevronLeft, ChevronRight, Plus } from 'lucide-react';
+import { formatISTTime, formatISTDate, IST_OFFSET_MINUTES } from '@/lib/timezone';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -52,11 +53,33 @@ function minutesToHHMM(minutes: number): string {
   return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
 }
 
+function getISTDate(dateStrOrObj: string | Date): Date {
+  const d = new Date(dateStrOrObj);
+  return new Date(d.getTime() + IST_OFFSET_MINUTES * 60 * 1000);
+}
+
+function getISTDay(dateStrOrObj: string | Date): number {
+  return getISTDate(dateStrOrObj).getUTCDay();
+}
+
+function getISTDateParts(dateStrOrObj: string | Date) {
+  const ist = getISTDate(dateStrOrObj);
+  return {
+    year: ist.getUTCFullYear(),
+    month: ist.getUTCMonth(),
+    date: ist.getUTCDate(),
+    hours: ist.getUTCHours(),
+    minutes: ist.getUTCMinutes(),
+  };
+}
+
 function isSameDay(a: Date, b: Date): boolean {
+  const aParts = getISTDateParts(a);
+  const bParts = getISTDateParts(b);
   return (
-    a.getFullYear() === b.getFullYear() &&
-    a.getMonth() === b.getMonth() &&
-    a.getDate() === b.getDate()
+    aParts.year === bParts.year &&
+    aParts.month === bParts.month &&
+    aParts.date === bParts.date
   );
 }
 
@@ -76,15 +99,18 @@ function getMondayOfWeek(date: Date): Date {
 }
 
 function formatDateLabel(d: Date): string {
-  return `${DAY_LABELS[d.getDay() === 0 ? 6 : d.getDay() - 1]} ${d.getDate()}`;
+  const day = getISTDay(d);
+  const parts = getISTDateParts(d);
+  return `${DAY_LABELS[day === 0 ? 6 : day - 1]} ${parts.date}`;
 }
 
 function formatWeekRange(start: Date): string {
   const end = addDays(start, 6);
-  const sMonth = MONTH_LABELS[start.getMonth()];
-  const eMonth = MONTH_LABELS[end.getMonth()];
-  const year = end.getFullYear();
-  return `${DAY_LABELS[0]} ${start.getDate()} ${sMonth} – ${DAY_LABELS[6]} ${end.getDate()} ${eMonth} ${year}`;
+  const sParts = getISTDateParts(start);
+  const eParts = getISTDateParts(end);
+  const sMonth = MONTH_LABELS[sParts.month];
+  const eMonth = MONTH_LABELS[eParts.month];
+  return `${DAY_LABELS[0]} ${sParts.date} ${sMonth} – ${DAY_LABELS[6]} ${eParts.date} ${eMonth} ${eParts.year}`;
 }
 
 // ---------------------------------------------------------------------------
@@ -269,8 +295,10 @@ export function WeekView({
   // ---- positioning helpers --------------------------------------------------
   const getBlockPosition = useCallback(
     (slotStart: Date, slotEnd: Date) => {
-      const startMin = slotStart.getHours() * 60 + slotStart.getMinutes();
-      const endMin = slotEnd.getHours() * 60 + slotEnd.getMinutes();
+      const startParts = getISTDateParts(slotStart);
+      const endParts = getISTDateParts(slotEnd);
+      const startMin = startParts.hours * 60 + startParts.minutes;
+      const endMin = endParts.hours * 60 + endParts.minutes;
 
       const topMin = Math.max(startMin - dayStartMin, 0);
       const bottomMin = Math.min(endMin - dayStartMin, totalMinutes);
@@ -305,7 +333,8 @@ export function WeekView({
 
   // ---- "now" indicator position ---------------------------------------------
   const nowIndicator = useMemo(() => {
-    const nowMin = now.getHours() * 60 + now.getMinutes();
+    const parts = getISTDateParts(now);
+    const nowMin = parts.hours * 60 + parts.minutes;
     if (nowMin < dayStartMin || nowMin > dayEndMin) return null;
     // check if today is in this week
     const dayIdx = weekDays.findIndex((d) => isSameDay(d, now));
@@ -551,14 +580,25 @@ export function WeekView({
                           const widthPct = 100 / groupSize;
                           const leftPct = index * widthPct;
 
-                          const serviceName =
-                            appointment.services?.name ?? 'Service';
+                          let serviceName = 'Service';
+                          if (appointment.appointment_services && appointment.appointment_services.length > 0) {
+                            serviceName = appointment.appointment_services
+                              .map(as => as.services?.name)
+                              .filter(Boolean)
+                              .join(' + ');
+                          } else if (appointment.services) {
+                            serviceName = appointment.services.name;
+                          }
+
                           const customerName =
                             appointment.customers?.name ?? 'Customer';
+                          
+                          const startParts = getISTDateParts(start);
+                          const endParts = getISTDateParts(end);
                           const timeLabel = `${minutesToHHMM(
-                            start.getHours() * 60 + start.getMinutes(),
+                            startParts.hours * 60 + startParts.minutes,
                           )} – ${minutesToHHMM(
-                            end.getHours() * 60 + end.getMinutes(),
+                            endParts.hours * 60 + endParts.minutes,
                           )}`;
 
                           const isPast =

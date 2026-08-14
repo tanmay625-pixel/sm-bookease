@@ -1,11 +1,13 @@
 import { cn } from '@/lib/utils';
 import { Badge } from '@/components/ui/badge';
 import type { AppointmentRow, CustomerRow, ServiceRow, StaffRow } from '@/lib/supabase/types';
+import { formatISTTime, formatISTDate } from '@/lib/timezone';
 
 export type AppointmentWithRelations = AppointmentRow & {
   customers?: CustomerRow | null;
   services?: ServiceRow | null;
   staff?: StaffRow | null;
+  appointment_services?: { services: ServiceRow | null }[];
 };
 
 const STATUS_STYLES: Record<
@@ -45,22 +47,21 @@ export function TokenStubCard({
   const slotStart = new Date(appointment.slot_start);
   const slotEnd = new Date(appointment.slot_end);
 
-  const timeStr = slotStart.toLocaleTimeString([], {
-    hour: '2-digit',
-    minute: '2-digit',
-  });
-  const endTimeStr = slotEnd.toLocaleTimeString([], {
-    hour: '2-digit',
-    minute: '2-digit',
-  });
-  const dateStr = slotStart.toLocaleDateString('en-IN', {
-    weekday: 'short',
-    day: 'numeric',
-    month: 'short',
-  });
+  const timeStr = formatISTTime(appointment.slot_start);
+  const endTimeStr = formatISTTime(appointment.slot_end);
+  const dateStr = formatISTDate(appointment.slot_start, false);
 
   const clientName = appointment.customers?.name ?? 'Customer';
-  const serviceName = appointment.services?.name ?? 'Appointment';
+  
+  let serviceName = 'Appointment';
+  if (appointment.appointment_services && appointment.appointment_services.length > 0) {
+    serviceName = appointment.appointment_services
+      .map((as) => as.services?.name)
+      .filter(Boolean)
+      .join(' + ');
+  } else if (appointment.services) {
+    serviceName = appointment.services.name;
+  }
 
   return (
     <div

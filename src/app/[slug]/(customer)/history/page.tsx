@@ -10,7 +10,11 @@ import Link from 'next/link';
 import { CalendarCheck } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 
-type AppointmentWithService = AppointmentRow & { services: ServiceRow | null };
+type AppointmentWithService = AppointmentRow & { 
+  services: ServiceRow | null;
+  staff?: any;
+  appointment_services?: { services: ServiceRow | null }[];
+};
 
 export default async function HistoryPage({
   params,

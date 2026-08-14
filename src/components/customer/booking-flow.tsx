@@ -7,6 +7,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { getAvailableSlots, createAppointmentAsCustomer } from '@/app/actions/customer/booking';
 import { TokenStubCard } from '@/components/token-stub-card';
 import type { ServiceRow, StaffRow, AppointmentRow } from '@/lib/supabase/types';
+import { formatISTTime, formatISTDate, todayIST } from '@/lib/timezone';
 import {
   Scissors,
   User,
@@ -51,12 +52,12 @@ export function BookingFlow({
   isSignedIn,
   initialParams,
 }: BookingFlowProps) {
-  const today = new Date().toISOString().split('T')[0];
+  const today = todayIST();
 
   // Resolve initial state if restored from sign-in redirection
-  const initService = initialParams?.serviceId
-    ? services.find((s) => s.id === initialParams.serviceId) ?? null
-    : null;
+  const initServices = initialParams?.serviceId
+    ? services.filter((s) => initialParams.serviceId!.split(',').includes(s.id))
+    : [];
 
   const initStaff = initialParams?.staffId
     ? initialParams.staffId === 'any'
@@ -70,10 +71,10 @@ export function BookingFlow({
     ? { slotStart: initialParams.slotStart, slotEnd: initialParams.slotEnd || '' }
     : null;
 
-  const initStep: Step = initService && initSlot ? 4 : 1;
+  const initStep: Step = initServices.length > 0 && initSlot ? 4 : 1;
 
   const [step, setStep] = useState<Step>(initStep);
-  const [selectedService, setSelectedService] = useState<ServiceRow | null>(initService);
+  const [selectedServices, setSelectedServices] = useState<ServiceRow[]>(initServices);
   const [selectedStaff, setSelectedStaff] = useState<StaffRow | null | 'any'>(initStaff);
   const [date, setDate] = useState<string>(initDate);
   const [slots, setSlots] = useState<Slot[]>([]);
@@ -86,12 +87,12 @@ export function BookingFlow({
 
   // Load slots when entering step 3
   const loadSlots = useCallback(
-    async (serviceId: string, staffIdOrAny: string, d: string) => {
+    async (serviceIds: string[], staffIdOrAny: string, d: string) => {
       setLoadingSlots(true);
       setSlotError(null);
       setSelectedSlot(null);
       try {
-        const result = await getAvailableSlots(slug, serviceId, staffIdOrAny, d);
+        const result = await getAvailableSlots(slug, serviceIds, staffIdOrAny, d);
         setSlots(result);
         if (result.length === 0) {
           setSlotError('No available slots on this date — try another day.');
@@ -107,32 +108,32 @@ export function BookingFlow({
   );
 
   function goToStep3() {
-    if (!selectedService) return;
+    if (selectedServices.length === 0) return;
     const staffId = selectedStaff === 'any' || !selectedStaff
       ? 'any'
       : selectedStaff.id;
-    loadSlots(selectedService.id, staffId, date);
+    loadSlots(selectedServices.map(s => s.id), staffId, date);
     setStep(3);
   }
 
   function handleDateChange(newDate: string) {
     setDate(newDate);
-    if (!selectedService) return;
+    if (selectedServices.length === 0) return;
     const staffId = selectedStaff === 'any' || !selectedStaff
       ? 'any'
       : selectedStaff.id;
-    loadSlots(selectedService.id, staffId, newDate);
+    loadSlots(selectedServices.map(s => s.id), staffId, newDate);
   }
 
   function handleConfirm() {
-    if (!selectedService || !selectedSlot) return;
+    if (selectedServices.length === 0 || !selectedSlot) return;
     if (!isSignedIn) return; // UI already shows sign-in prompt
 
     setBookingError(null);
     startBooking(async () => {
       try {
         const appt = await createAppointmentAsCustomer(slug, {
-          serviceId: selectedService.id,
+          serviceIds: selectedServices.map(s => s.id),
           staffId:
             selectedStaff === 'any' || !selectedStaff
               ? undefined
@@ -150,7 +151,7 @@ export function BookingFlow({
 
   // Build sign-in link that carries in-progress booking selection (Bug 6 Fix)
   const signInParams = new URLSearchParams();
-  if (selectedService) signInParams.set('serviceId', selectedService.id);
+  if (selectedServices.length > 0) signInParams.set('serviceId', selectedServices.map(s => s.id).join(','));
   if (selectedStaff) {
     signInParams.set('staffId', selectedStaff === 'any' ? 'any' : selectedStaff.id);
   }
@@ -167,7 +168,8 @@ export function BookingFlow({
     // Build a relation-enriched version for TokenStubCard
     const enriched = {
       ...bookedAppt,
-      services: selectedService ?? undefined,
+      services: selectedServices[0] ?? undefined,
+      appointment_services: selectedServices.map(s => ({ services: s })),
       customers: null,
       staff: selectedStaff ? staff.find((s) => s.id === selectedStaff) ?? null : null,
     };
@@ -195,7 +197,7 @@ export function BookingFlow({
             onClick={() => {
               setBooked(null);
               setStep(1);
-              setSelectedService(null);
+              setSelectedServices([]);
               setSelectedStaff('any');
               setSelectedSlot(null);
             }}
@@ -284,12 +286,18 @@ export function BookingFlow({
           ) : (
             <div className="flex flex-col gap-2.5">
               {services.map((svc) => {
-                const isSelected = selectedService?.id === svc.id;
+                const isSelected = selectedServices.some(s => s.id === svc.id);
                 return (
                   <button
                     key={svc.id}
                     type="button"
-                    onClick={() => setSelectedService(svc)}
+                    onClick={() => {
+                      setSelectedServices(prev => 
+                        prev.some(s => s.id === svc.id)
+                          ? prev.filter(s => s.id !== svc.id)
+                          : [...prev, svc]
+                      )
+                    }}
                     className={cn(
                       'flex items-center justify-between rounded-xl border p-4 text-left transition-all',
                       'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
@@ -317,10 +325,16 @@ export function BookingFlow({
             </div>
           )}
 
-          <div className="mt-6">
+          <div className="mt-6 flex flex-col gap-3">
+            {selectedServices.length > 0 && (
+              <div className="flex items-center justify-between text-sm px-1">
+                <span className="text-muted-foreground">{selectedServices.length} service{selectedServices.length > 1 ? 's' : ''} selected</span>
+                <span className="font-semibold">₹{selectedServices.reduce((acc, s) => acc + Number(s.price), 0)}</span>
+              </div>
+            )}
             <Button
               className="w-full"
-              disabled={!selectedService}
+              disabled={selectedServices.length === 0}
               onClick={() => setStep(2)}
             >
               Continue to Staff →
@@ -411,7 +425,7 @@ export function BookingFlow({
         <div className="flex-1 p-4 max-w-md mx-auto w-full">
           <h2 className="text-sm font-semibold mb-1">Pick date & time</h2>
           <p className="text-xs text-muted-foreground mb-4">
-            Available slots for {selectedService?.name}
+            Available slots for {selectedServices.map(s => s.name).join(' + ')}
           </p>
 
           {/* Date Picker Input */}
@@ -443,10 +457,7 @@ export function BookingFlow({
             <div className="grid grid-cols-3 gap-2">
               {slots.map((slot) => {
                 const isSelected = selectedSlot?.slotStart === slot.slotStart;
-                const timeLabel = new Date(slot.slotStart).toLocaleTimeString([], {
-                  hour: '2-digit',
-                  minute: '2-digit',
-                });
+                const timeLabel = formatISTTime(slot.slotStart);
                 return (
                   <button
                     key={slot.slotStart}
@@ -487,12 +498,12 @@ export function BookingFlow({
           {/* Summary */}
           <div className="rounded-xl border border-border bg-card p-4 flex flex-col gap-3 mb-4">
             <div className="flex justify-between text-sm">
-              <span className="text-muted-foreground">Service</span>
-              <span className="font-medium">{selectedService?.name}</span>
+              <span className="text-muted-foreground">Service{selectedServices.length > 1 ? 's' : ''}</span>
+              <span className="font-medium max-w-[60%] text-right">{selectedServices.map(s => s.name).join(', ')}</span>
             </div>
             <div className="flex justify-between text-sm">
               <span className="text-muted-foreground">Duration</span>
-              <span className="font-medium">{selectedService?.duration_minutes} min</span>
+              <span className="font-medium">{selectedServices.reduce((sum, s) => sum + s.duration_minutes, 0)} min</span>
             </div>
             <div className="flex justify-between text-sm">
               <span className="text-muted-foreground">Staff</span>
@@ -503,26 +514,20 @@ export function BookingFlow({
             <div className="flex justify-between text-sm">
               <span className="text-muted-foreground">Date</span>
               <span className="font-medium">
-                {new Date(date).toLocaleDateString('en-IN', {
-                  weekday: 'short', day: 'numeric', month: 'short', year: 'numeric'
-                })}
+                {date && formatISTDate(`${date}T00:00:00Z`, true)}
               </span>
             </div>
             <div className="flex justify-between text-sm">
               <span className="text-muted-foreground">Time</span>
               <span className="font-medium">
-                {selectedSlot && new Date(selectedSlot.slotStart).toLocaleTimeString([], {
-                  hour: '2-digit', minute: '2-digit'
-                })}
+                {selectedSlot && formatISTTime(selectedSlot.slotStart)}
                 {selectedSlot && ' – '}
-                {selectedSlot && new Date(selectedSlot.slotEnd).toLocaleTimeString([], {
-                  hour: '2-digit', minute: '2-digit'
-                })}
+                {selectedSlot && formatISTTime(selectedSlot.slotEnd)}
               </span>
             </div>
             <div className="flex justify-between text-sm font-semibold border-t border-border pt-3 mt-1">
               <span>Total</span>
-              <span className="text-primary">₹{selectedService?.price}</span>
+              <span className="text-primary">₹{selectedServices.reduce((sum, s) => sum + Number(s.price), 0)}</span>
             </div>
           </div>
 

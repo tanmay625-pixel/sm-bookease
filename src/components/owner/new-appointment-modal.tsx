@@ -29,6 +29,7 @@ import { getAvailableSlots } from '@/app/actions/customer/booking';
 import type { StaffRow, ServiceRow } from '@/lib/supabase/types';
 import type { AppointmentWithRelations } from '@/components/token-stub-card';
 import { CalendarDays, Clock, Plus, Pencil } from 'lucide-react';
+import { formatISTTime, todayIST } from '@/lib/timezone';
 
 interface NewAppointmentModalProps {
   open: boolean;
@@ -66,7 +67,7 @@ export function NewAppointmentModal({
   const [clientEmail, setClientEmail] = useState('');
   const [serviceId, setServiceId] = useState('');
   const [staffId, setStaffId] = useState('any');
-  const [date, setDate] = useState(() => new Date().toISOString().split('T')[0]);
+  const [date, setDate] = useState(() => todayIST());
   const [slotStart, setSlotStart] = useState('');
   const [notes, setNotes] = useState('');
 
@@ -86,7 +87,7 @@ export function NewAppointmentModal({
         setDate(
           appointment.slot_start
             ? appointment.slot_start.split('T')[0]
-            : new Date().toISOString().split('T')[0]
+            : todayIST()
         );
         setSlotStart(appointment.slot_start);
         setNotes(appointment.notes ?? '');
@@ -96,7 +97,7 @@ export function NewAppointmentModal({
         setClientEmail('');
         setServiceId('');
         setStaffId('any');
-        setDate(new Date().toISOString().split('T')[0]);
+        setDate(todayIST());
         setSlotStart('');
         setNotes('');
       }
@@ -113,7 +114,7 @@ export function NewAppointmentModal({
     }
     setLoadingSlots(true);
 
-    getAvailableSlots(salonSlug, serviceId, staffId, date)
+    getAvailableSlots(salonSlug, [serviceId], staffId, date)
       .then((fetchedSlots) => {
         let combined = [...fetchedSlots];
 
@@ -183,6 +184,8 @@ export function NewAppointmentModal({
           // Edit existing appointment
           await updateAppointmentDetails({
             appointmentId: appointment.id,
+            salonId,
+            serviceIds: [serviceId],
             staffId: staffId === 'any' ? undefined : staffId,
             slotStart: chosenSlot.slotStart,
             slotEnd: chosenSlot.slotEnd,
@@ -206,7 +209,7 @@ export function NewAppointmentModal({
           await createAppointmentAsOwner({
             salonId,
             customerId: customer.id,
-            serviceId,
+            serviceIds: [serviceId],
             staffId: staffId === 'any' ? undefined : staffId,
             slotStart: chosenSlot.slotStart,
             slotEnd: chosenSlot.slotEnd,
@@ -226,7 +229,6 @@ export function NewAppointmentModal({
     });
   }
 
-  const today = new Date().toISOString().split('T')[0];
   const selectedService = services.find((s) => s.id === serviceId);
 
   return (
@@ -368,7 +370,7 @@ export function NewAppointmentModal({
                 id="nm-date"
                 type="date"
                 value={date}
-                min={today}
+                min={todayIST()}
                 onChange={(e) => {
                   setDate(e.target.value);
                   setSlotStart('');
@@ -393,10 +395,7 @@ export function NewAppointmentModal({
               ) : (
                 <div className="flex flex-wrap gap-1.5">
                   {slots.map((s) => {
-                    const label = new Date(s.slotStart).toLocaleTimeString([], {
-                      hour: '2-digit',
-                      minute: '2-digit',
-                    });
+                    const label = formatISTTime(s.slotStart);
                     const selected = slotStart === s.slotStart;
                     return (
                       <button

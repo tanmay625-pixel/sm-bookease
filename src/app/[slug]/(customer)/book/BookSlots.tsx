@@ -3,18 +3,19 @@
 import { useTransition, useState } from 'react';
 import { createAppointmentAsCustomer } from '@/app/actions/customer/booking';
 import Link from 'next/link';
+import { formatISTTime } from '@/lib/timezone';
 
 type Slot = { slotStart: string; slotEnd: string };
 
 export default function BookSlots({
   slug,
-  serviceId,
+  serviceIds,
   staffId,
   slots,
   isSignedIn,
 }: {
   slug: string;
-  serviceId: string;
+  serviceIds: string[];
   staffId: string;
   slots: Slot[];
   isSignedIn: boolean;
@@ -35,7 +36,7 @@ export default function BookSlots({
     return (
       <p style={{ color: 'green' }}>
         ✓ Appointment booked for{' '}
-        {new Date(bookedSlot).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}.{' '}
+        {formatISTTime(bookedSlot)}.{' '}
         <Link href={`/${slug}/history`}>View my appointments →</Link>
       </p>
     );
@@ -66,7 +67,7 @@ export default function BookSlots({
                 startTransition(async () => {
                   try {
                     await createAppointmentAsCustomer(slug, {
-                      serviceId,
+                      serviceIds,
                       staffId: staffId === 'any' ? undefined : staffId,
                       slotStart: slot.slotStart,
                     });
@@ -81,10 +82,7 @@ export default function BookSlots({
                 });
               }}
             >
-              {new Date(slot.slotStart).toLocaleTimeString([], {
-                hour: '2-digit',
-                minute: '2-digit',
-              })}
+              {formatISTTime(slot.slotStart)}
             </button>
           </li>
         ))}
