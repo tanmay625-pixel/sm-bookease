@@ -141,7 +141,8 @@ export async function verifyOtp(
 
 export async function saveCustomerName(
   salonSlug: string,
-  name: string
+  name: string,
+  email?: string | null
 ): Promise<{ ok: boolean; error?: string }> {
   const trimmedName = name.trim();
   if (!trimmedName) {
@@ -182,6 +183,7 @@ export async function saveCustomerName(
         salon_id: salon.id,
         phone: session.phone,
         name: trimmedName,
+        email: email || null,
       },
       { onConflict: 'salon_id,phone' }
     );

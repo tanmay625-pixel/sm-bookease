@@ -7,6 +7,8 @@ type StaffItem = {
   id: string;
   name: string;
   role: string | null;
+  phone: string | null;
+  email: string | null;
 };
 
 export function StaffEditRow({ staff }: { staff: StaffItem }) {
@@ -24,6 +26,8 @@ export function StaffEditRow({ staff }: { staff: StaffItem }) {
       await updateStaff(staff.id, {
         name: formData.get('name') as string,
         role: (formData.get('role') as string) || null,
+        phone: formData.get('phone') as string,
+        email: (formData.get('email') as string) || null,
       });
       // Collapse after the server action + revalidation cycle completes
       setOpen(false);
@@ -56,24 +60,42 @@ export function StaffEditRow({ staff }: { staff: StaffItem }) {
       {/* Inline edit form — shown only when open */}
       {open && (
         <form
-          style={{ marginTop: '0.5rem', paddingLeft: '1rem' }}
+          style={{ marginTop: '0.5rem', paddingLeft: '1rem', display: 'flex', flexDirection: 'column', gap: '0.5rem' }}
           action={handleSave}
         >
-          <input
-            name="name"
-            defaultValue={staff.name}
-            required
-            style={{ marginRight: '0.5rem' }}
-          />
-          <input
-            name="role"
-            defaultValue={staff.role ?? ''}
-            placeholder="Role (optional)"
-            style={{ marginRight: '0.5rem' }}
-          />
-          <button type="submit" disabled={isPending}>
-            {isPending ? 'Saving…' : 'Save'}
-          </button>
+          <div style={{ display: 'flex', gap: '0.5rem' }}>
+            <input
+              name="name"
+              defaultValue={staff.name}
+              required
+              placeholder="Name *"
+            />
+            <input
+              name="role"
+              defaultValue={staff.role ?? ''}
+              placeholder="Role (optional)"
+            />
+          </div>
+          <div style={{ display: 'flex', gap: '0.5rem' }}>
+            <input
+              name="phone"
+              type="tel"
+              defaultValue={staff.phone ?? ''}
+              placeholder="9876543210"
+              required
+              inputMode="numeric"
+              maxLength={10}
+            />
+            <input
+              name="email"
+              type="email"
+              defaultValue={staff.email ?? ''}
+              placeholder="Email (optional)"
+            />
+            <button type="submit" disabled={isPending}>
+              {isPending ? 'Saving…' : 'Save'}
+            </button>
+          </div>
         </form>
       )}
     </li>

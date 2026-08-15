@@ -22,6 +22,7 @@ function OtpSignInContent({ slug }: OtpSignInProps) {
   const [step, setStep] = useState<'phone' | 'otp' | 'name'>('phone');
   const [phone, setPhone] = useState('');
   const [name, setName] = useState('');
+  const [email, setEmail] = useState('');
   const [otp, setOtp] = useState<string[]>(Array(OTP_LENGTH).fill(''));
   const [error, setError] = useState<string | null>(null);
   const [countdown, setCountdown] = useState(0);
@@ -148,7 +149,7 @@ function OtpSignInContent({ slug }: OtpSignInProps) {
     }
     setError(null);
     startTransition(async () => {
-      const result = await saveCustomerName(slug, name);
+      const result = await saveCustomerName(slug, name, email || null);
       if (!result.ok) {
         setError(result.error ?? 'Failed to save name');
         return;
@@ -284,6 +285,16 @@ function OtpSignInContent({ slug }: OtpSignInProps) {
               placeholder="e.g. Priya Sharma"
               required
               autoFocus
+            />
+          </div>
+          <div className="flex flex-col gap-1.5">
+            <Label htmlFor="email-input" className="text-xs">Email (optional)</Label>
+            <Input
+              id="email-input"
+              type="email"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              placeholder="e.g. priya@example.com"
             />
           </div>
           {error && (

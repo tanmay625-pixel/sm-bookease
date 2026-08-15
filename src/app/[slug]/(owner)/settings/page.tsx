@@ -154,7 +154,7 @@ export default async function SettingsPage({
                 name:  formData.get('name')  as string,
                 role:  (formData.get('role')  as string) || null,
                 email: (formData.get('contact') as string) || null,
-                phone: null,
+                phone: formData.get('phone') as string,
               });
             }}
           >
@@ -165,7 +165,10 @@ export default async function SettingsPage({
               <Input name="name"  placeholder="Name *" required />
               <Input name="role"  placeholder="Role (optional)" />
             </div>
-            <Input name="contact" type="contact" placeholder="Contact (optional)" />
+            <div className="grid grid-cols-2 gap-2">
+              <Input name="phone" type="tel" placeholder="Phone *" required />
+              <Input name="contact" type="email" placeholder="Email (optional)" />
+            </div>
             <Button type="submit" size="sm" className="self-start">Add Staff</Button>
           </form>
         </TabsContent>
