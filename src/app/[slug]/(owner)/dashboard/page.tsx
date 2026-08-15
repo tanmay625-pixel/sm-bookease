@@ -19,7 +19,7 @@ export default async function DashboardPage({
 
   const { data: salonData } = await supabase
     .from('salons')
-    .select('id, name')
+    .select('id, name, working_hours')
     .eq('slug', slug)
     .single();
   const salon = salonData as SalonRow | null;
@@ -71,6 +71,7 @@ export default async function DashboardPage({
             salonSlug={slug}
             staff={staff}
             services={services}
+            workingHours={salon.working_hours as { start: string; end: string }}
           />
         )}
       </div>
@@ -122,6 +123,7 @@ export default async function DashboardPage({
                       salonId={salon.id}
                       staff={staff}
                       services={services}
+                      workingHours={salon.working_hours as { start: string; end: string }}
                     />
                   ) : undefined
                 }

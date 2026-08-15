@@ -6,6 +6,7 @@ import { revalidatePath } from 'next/cache';
 import { createClerkSupabaseClient } from '@/lib/supabase/server';
 import { sendWhatsAppMessage } from '@/lib/whatsapp';
 import type { Database, CustomerRow, ServiceRow, StaffRow } from '@/lib/supabase/types';
+import { findConflictingStaffIds } from '@/lib/availability';
 
 type AppointmentRow = Database['public']['Tables']['appointments']['Row'];
 type AppointmentStatus = Database['public']['Enums']['appointment_status'];
@@ -96,12 +97,32 @@ export async function createAppointmentAsOwner(
   const userId = await requireAuth();
   const supabase = createClerkSupabaseClient();
 
+  // Fresh conflict check immediately before insert — protects against race conditions
+  const { data: conflictsData } = await supabase
+    .from('appointments')
+    .select('id, staff_id, slot_start, slot_end')
+    .eq('salon_id', input.salonId)
+    .in('status', ['pending', 'confirmed'])
+    .lt('slot_start', input.slotEnd)
+    .gt('slot_end', input.slotStart);
+
+  const conflicts = (conflictsData ?? []) as Array<{ id: string; staff_id: string | null; slot_start: string; slot_end: string }>;
+  const busyStaffIds = findConflictingStaffIds(
+    conflicts,
+    new Date(input.slotStart).getTime(),
+    new Date(input.slotEnd).getTime()
+  );
+
   let assignedStaffId: string | null = null;
 
   if (input.staffId && input.staffId !== 'any') {
+    // Specific staff — reject if busy
+    if (busyStaffIds.has(input.staffId)) {
+      throw new Error('This staff member already has an appointment at this time — please choose a different time or staff member.');
+    }
     assignedStaffId = input.staffId;
   } else {
-    // Fetch all staff for this salon to find an available member
+    // "Any" — assign first actually-free staff member
     const { data: staffData } = await supabase
       .from('staff')
       .select('id')
@@ -110,20 +131,17 @@ export async function createAppointmentAsOwner(
     const salonStaff = (staffData ?? []) as { id: string }[];
 
     if (salonStaff.length > 0) {
-      // Find busy staff during this slot
-      const { data: conflictsData } = await supabase
-        .from('appointments')
-        .select('staff_id')
-        .eq('salon_id', input.salonId)
-        .in('status', ['pending', 'confirmed'])
-        .lt('slot_start', input.slotEnd)
-        .gt('slot_end', input.slotStart);
-
-      const conflicts = (conflictsData ?? []) as Array<{ staff_id: string | null }>;
-      const busyStaffIds = new Set(conflicts.map((c) => c.staff_id).filter(Boolean) as string[]);
-
       const freeStaff = salonStaff.find((s) => !busyStaffIds.has(s.id));
-      assignedStaffId = freeStaff ? freeStaff.id : salonStaff[0].id;
+      if (!freeStaff) {
+        throw new Error('All staff members are booked at this time — please choose a different time.');
+      }
+      assignedStaffId = freeStaff.id;
+    } else {
+      // No staff records (solo operator)
+      if (conflicts.length > 0) {
+        throw new Error('This time slot is already booked — please choose a different time.');
+      }
+      assignedStaffId = null;
     }
   }
 
@@ -225,15 +243,19 @@ export async function updateAppointmentDetails(
 
   const { data: conflictsData } = await supabase
     .from('appointments')
-    .select('id, staff_id')
+    .select('id, staff_id, slot_start, slot_end')
     .eq('salon_id', existing.salon_id)
     .neq('id', input.appointmentId)
     .in('status', ['pending', 'confirmed'])
     .lt('slot_start', slotEnd)
     .gt('slot_end', slotStart);
 
-  const conflicts = (conflictsData ?? []) as Array<{ id: string; staff_id: string | null }>;
-  const busyStaffIds = new Set(conflicts.map((c) => c.staff_id).filter(Boolean) as string[]);
+  const conflicts = (conflictsData ?? []) as Array<{ id: string; staff_id: string | null; slot_start: string; slot_end: string }>;
+  const busyStaffIds = findConflictingStaffIds(
+    conflicts,
+    new Date(slotStart).getTime(),
+    new Date(slotEnd).getTime()
+  );
 
   let assignedStaffId: string | null = null;
 
@@ -244,7 +266,12 @@ export async function updateAppointmentDetails(
         }
         assignedStaffId = input.staffId;
     } else {
-        assignedStaffId = null;
+        // "Any" — assign first actually-free staff member
+        const freeStaff = salonStaff.find((s) => !busyStaffIds.has(s.id));
+        if (salonStaff.length > 0 && !freeStaff) {
+          throw new Error('All staff members are booked at this time — please choose a different time.');
+        }
+        assignedStaffId = freeStaff ? freeStaff.id : null;
     }
   }
 

@@ -21,6 +21,7 @@ export default async function BookPage({
     date: typeof sp.date === 'string' ? sp.date : undefined,
     slotStart: typeof sp.slotStart === 'string' ? sp.slotStart : undefined,
     slotEnd: typeof sp.slotEnd === 'string' ? sp.slotEnd : undefined,
+    time: typeof sp.time === 'string' ? sp.time : undefined,
   };
 
   // Determine if the customer is signed in (no redirect — sign-in is optional until submit)
@@ -34,7 +35,7 @@ export default async function BookPage({
 
   const { data: salonData } = await supabase
     .from('salons')
-    .select('id, name')
+    .select('id, name, working_hours')
     .eq('slug', slug)
     .single();
   const salon = salonData as SalonRow | null;
@@ -67,6 +68,7 @@ export default async function BookPage({
         staff={staff}
         isSignedIn={isSignedIn}
         initialParams={initialParams}
+        workingHours={salon.working_hours as { start: string; end: string }}
       />
     </div>
   );

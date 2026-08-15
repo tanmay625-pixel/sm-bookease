@@ -6,6 +6,7 @@ import { createServiceSupabaseClient } from '@/lib/supabase/service';
 import { verifySessionCookie } from '@/lib/otp';
 import type { Database, SalonRow, ServiceRow, StaffRow } from '@/lib/supabase/types';
 import { toIST, istDateRange } from '@/lib/timezone';
+import { findConflictingStaffIds } from '@/lib/availability';
 
 const SESSION_COOKIE_NAME = 'bookmi_session';
 
@@ -49,6 +50,9 @@ async function requireCustomerSession(salonSlug: string) {
 // When date is today, excludes slots whose start time has already passed.
 // ─────────────────────────────────────────────
 
+/**
+ * @deprecated Use ScrollTimePicker + checkSlotAvailability instead.
+ */
 export async function getAvailableSlots(
   salonSlug: string,
   serviceIds: string[],
@@ -141,32 +145,21 @@ export async function getAvailableSlots(
     let isBlocked = false;
 
     if (staffIdOrAny !== 'any') {
-      // Specific staff selected: blocked if that staff has an overlapping appointment
-      isBlocked = existingAppointments.some(
-        (a) => cursor < new Date(a.slot_end).getTime() && slotEnd > new Date(a.slot_start).getTime()
-      );
+      const busyStaff = findConflictingStaffIds(existingAppointments, cursor, slotEnd);
+      if (busyStaff.has(staffIdOrAny)) {
+        isBlocked = true;
+      }
     } else {
-      // 'any' staff selected:
+      const busyStaff = findConflictingStaffIds(existingAppointments, cursor, slotEnd);
       if (salonStaff.length > 0) {
-        // Find which staff members are busy during this slot
-        const busyStaffIds = new Set<string>();
-        for (const appt of existingAppointments) {
-          const apptStart = new Date(appt.slot_start).getTime();
-          const apptEnd = new Date(appt.slot_end).getTime();
-          if (cursor < apptEnd && slotEnd > apptStart && appt.staff_id) {
-            busyStaffIds.add(appt.staff_id);
-          }
-        }
-        // Blocked only if all staff members are busy
-        const availableStaffCount = salonStaff.filter((s) => !busyStaffIds.has(s.id)).length;
+        const availableStaffCount = salonStaff.filter((s) => !busyStaff.has(s.id)).length;
         if (availableStaffCount === 0) {
           isBlocked = true;
         }
       } else {
-        // No staff configured in salon: check for any overlapping appointment
-        isBlocked = existingAppointments.some(
-          (a) => cursor < new Date(a.slot_end).getTime() && slotEnd > new Date(a.slot_start).getTime()
-        );
+        if (busyStaff.size > 0 || existingAppointments.some(a => new Date(a.slot_start).getTime() < slotEnd && new Date(a.slot_end).getTime() > cursor)) {
+          isBlocked = true;
+        }
       }
     }
 
@@ -181,6 +174,102 @@ export async function getAvailableSlots(
   }
 
   return slots;
+}
+
+// ─────────────────────────────────────────────
+// checkSlotAvailability
+// Validates a specific time slot against working hours, past time, and existing appointments.
+// ─────────────────────────────────────────────
+export async function checkSlotAvailability(
+  salonSlug: string,
+  staffIdOrAny: string,       // UUID or 'any'
+  date: string,               // YYYY-MM-DD
+  startTime: string,          // "HH:MM" in IST
+  durationMinutes: number,
+  excludeAppointmentId?: string
+): Promise<{ available: boolean; conflictReason?: string }> {
+  const supabase = createServiceSupabaseClient();
+
+  const { data: salonData } = await supabase
+    .from('salons')
+    .select('id, working_hours, working_days')
+    .eq('slug', salonSlug)
+    .single();
+  const salon = salonData as SalonRow | null;
+
+  if (!salon) throw new Error('Salon not found');
+
+  const dateObj = new Date(`${date}T00:00:00`);
+  const dayNames = ['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat'];
+  const dayName = dayNames[dateObj.getDay()];
+
+  if (!salon.working_days.includes(dayName)) {
+    return { available: false, conflictReason: 'Salon is closed on this day' };
+  }
+
+  const wh = salon.working_hours as { start: string; end: string };
+  const dayStart = toIST(date, wh.start);
+  const dayEnd = toIST(date, wh.end);
+
+  const slotStart = toIST(date, startTime);
+  const slotEnd = new Date(slotStart.getTime() + durationMinutes * 60 * 1_000);
+
+  if (slotStart < dayStart || slotEnd > dayEnd) {
+    return { available: false, conflictReason: `Selected time falls outside working hours (${wh.start} – ${wh.end})` };
+  }
+
+  if (slotStart.getTime() <= Date.now()) {
+    return { available: false, conflictReason: 'This time has already passed' };
+  }
+
+  const { startOfDay, endOfDay } = istDateRange(date);
+
+  let apptQuery = supabase
+    .from('appointments')
+    .select('id, slot_start, slot_end, staff_id')
+    .eq('salon_id', salon.id)
+    .in('status', ['pending', 'confirmed'])
+    .gte('slot_start', startOfDay)
+    .lte('slot_start', endOfDay);
+
+  if (excludeAppointmentId) {
+    apptQuery = apptQuery.neq('id', excludeAppointmentId);
+  }
+
+  const { data: apptData } = await apptQuery;
+  const existingAppointments = (apptData ?? []) as Array<{
+    id: string;
+    slot_start: string;
+    slot_end: string;
+    staff_id: string | null;
+  }>;
+
+  const busyStaff = findConflictingStaffIds(existingAppointments, slotStart.getTime(), slotEnd.getTime());
+
+  if (staffIdOrAny !== 'any') {
+    if (busyStaff.has(staffIdOrAny)) {
+      return { available: false, conflictReason: 'Staff member is unavailable at this time' };
+    }
+  } else {
+    const { data: staffData } = await supabase
+      .from('staff')
+      .select('id')
+      .eq('salon_id', salon.id);
+    const salonStaff = (staffData ?? []) as Pick<StaffRow, 'id'>[];
+
+    if (salonStaff.length > 0) {
+      const availableStaffCount = salonStaff.filter((s) => !busyStaff.has(s.id)).length;
+      if (availableStaffCount === 0) {
+        return { available: false, conflictReason: 'All staff members are booked at this time' };
+      }
+    } else {
+      if (busyStaff.size > 0 || existingAppointments.some(a => new Date(a.slot_start).getTime() < slotEnd.getTime() && new Date(a.slot_end).getTime() > slotStart.getTime())) {
+         return { available: false, conflictReason: 'Slot is booked at this time' };
+      }
+    }
+  }
+
+  return { available: true };
 }
 
 // ─────────────────────────────────────────────
@@ -228,16 +317,21 @@ export async function createAppointmentAsCustomer(
   const salonStaff = (staffData ?? []) as Pick<StaffRow, 'id' | 'name'>[];
 
   // Fetch conflicting appointments in the requested slot
+  // CRITICAL: select slot_start and slot_end — findConflictingStaffIds needs them
   const { data: conflictsData } = await supabase
     .from('appointments')
-    .select('id, staff_id')
+    .select('id, staff_id, slot_start, slot_end')
     .eq('salon_id', salon.id)
     .in('status', ['pending', 'confirmed'])
     .lt('slot_start', slotEnd.toISOString())
     .gt('slot_end', slotStart.toISOString());
 
-  const conflicts = (conflictsData ?? []) as Array<{ id: string; staff_id: string | null }>;
-  const busyStaffIds = new Set(conflicts.map((c) => c.staff_id).filter(Boolean) as string[]);
+  const conflicts = (conflictsData ?? []) as Array<{ id: string; staff_id: string | null; slot_start: string; slot_end: string }>;
+  const busyStaffIds = findConflictingStaffIds(
+    conflicts,
+    slotStart.getTime(),
+    slotEnd.getTime()
+  );
 
   let assignedStaffId: string | null = null;
 

@@ -665,6 +665,7 @@ export function WeekView({
         salonSlug={salonSlug}
         staff={staff}
         services={services}
+        workingHours={workingHours as { start: string; end: string }}
         appointment={modalAppointment}
         onSuccess={() => {
           // Re-fetch current week after create/edit

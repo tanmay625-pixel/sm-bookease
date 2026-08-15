@@ -1,13 +1,11 @@
 'use client';
 
-import { useState, useTransition, useCallback } from 'react';
+import { useState, useTransition, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
-import { Skeleton } from '@/components/ui/skeleton';
-import { getAvailableSlots, createAppointmentAsCustomer } from '@/app/actions/customer/booking';
+import { checkSlotAvailability, createAppointmentAsCustomer } from '@/app/actions/customer/booking';
 import { TokenStubCard } from '@/components/token-stub-card';
 import type { ServiceRow, StaffRow, AppointmentRow } from '@/lib/supabase/types';
-import { formatISTTime, formatISTDate, todayIST } from '@/lib/timezone';
+import { formatISTTime, formatISTDate, todayIST, toIST, currentTimeIST } from '@/lib/timezone';
 import {
   Scissors,
   User,
@@ -16,23 +14,26 @@ import {
   CheckCircle2,
   ChevronLeft,
   CalendarPlus,
+  Loader2,
+  AlertCircle
 } from 'lucide-react';
 import Link from 'next/link';
 import { cn } from '@/lib/utils';
-
-type Slot = { slotStart: string; slotEnd: string };
+import { ScrollTimePicker } from '@/components/scroll-time-picker';
 
 interface BookingFlowProps {
   slug: string;
   services: ServiceRow[];
   staff: StaffRow[];
   isSignedIn: boolean;
+  workingHours: { start: string; end: string };
   initialParams?: {
     serviceId?: string;
     staffId?: string;
     date?: string;
     slotStart?: string;
     slotEnd?: string;
+    time?: string;
   };
 }
 
@@ -50,6 +51,7 @@ export function BookingFlow({
   services,
   staff,
   isSignedIn,
+  workingHours,
   initialParams,
 }: BookingFlowProps) {
   const today = todayIST();
@@ -67,78 +69,86 @@ export function BookingFlow({
 
   const initDate = initialParams?.date || today;
 
-  const initSlot: Slot | null = initialParams?.slotStart
-    ? { slotStart: initialParams.slotStart, slotEnd: initialParams.slotEnd || '' }
-    : null;
+  let initTime = initialParams?.time;
+  if (!initTime && initialParams?.slotStart) {
+      // Legacy fallback
+      const d = new Date(initialParams.slotStart);
+      const h = d.getHours();
+      const m = d.getMinutes();
+      initTime = `${h.toString().padStart(2, '0')}:${m.toString().padStart(2, '0')}`;
+  }
+  
+  if (!initTime) {
+      if (initDate === today) {
+          initTime = currentTimeIST(5);
+          if (initTime < workingHours.start) initTime = workingHours.start;
+          if (initTime > workingHours.end) initTime = workingHours.end;
+      } else {
+          initTime = workingHours.start || '10:00';
+      }
+  }
 
-  const initStep: Step = initServices.length > 0 && initSlot ? 4 : 1;
+  const initStep: Step = initServices.length > 0 && initialParams?.time ? 4 : 1;
 
   const [step, setStep] = useState<Step>(initStep);
   const [selectedServices, setSelectedServices] = useState<ServiceRow[]>(initServices);
   const [selectedStaff, setSelectedStaff] = useState<StaffRow | null | 'any'>(initStaff);
   const [date, setDate] = useState<string>(initDate);
-  const [slots, setSlots] = useState<Slot[]>([]);
-  const [selectedSlot, setSelectedSlot] = useState<Slot | null>(initSlot);
-  const [loadingSlots, setLoadingSlots] = useState(false);
-  const [slotError, setSlotError] = useState<string | null>(null);
+  const [selectedTime, setSelectedTime] = useState<string>(initTime);
+  const [availability, setAvailability] = useState<{ available: boolean; conflictReason?: string } | null>(null);
+  const [checkingAvailability, setCheckingAvailability] = useState(false);
+  
   const [bookingPending, startBooking] = useTransition();
   const [booked, setBooked] = useState<AppointmentRow | null>(null);
   const [bookingError, setBookingError] = useState<string | null>(null);
 
-  // Load slots when entering step 3
-  const loadSlots = useCallback(
-    async (serviceIds: string[], staffIdOrAny: string, d: string) => {
-      setLoadingSlots(true);
-      setSlotError(null);
-      setSelectedSlot(null);
+  const totalDuration = selectedServices.reduce((acc, s) => acc + s.duration_minutes, 0);
+
+  // Debounced availability check
+  useEffect(() => {
+    if (step !== 3 || selectedServices.length === 0) return;
+
+    setCheckingAvailability(true);
+    setAvailability(null);
+
+    const staffIdOrAny = selectedStaff === 'any' || !selectedStaff ? 'any' : selectedStaff.id;
+    
+    const timer = setTimeout(async () => {
       try {
-        const result = await getAvailableSlots(slug, serviceIds, staffIdOrAny, d);
-        setSlots(result);
-        if (result.length === 0) {
-          setSlotError('No available slots on this date — try another day.');
-        }
-      } catch {
-        setSlotError('Could not load slots. Please try again.');
-        setSlots([]);
+        const res = await checkSlotAvailability(slug, staffIdOrAny, date, selectedTime, totalDuration);
+        setAvailability(res);
+      } catch (err) {
+        setAvailability({ available: false, conflictReason: 'Failed to check availability.' });
       } finally {
-        setLoadingSlots(false);
+        setCheckingAvailability(false);
       }
-    },
-    [slug]
-  );
+    }, 500);
+
+    return () => clearTimeout(timer);
+  }, [step, slug, date, selectedTime, selectedStaff, selectedServices, totalDuration]);
 
   function goToStep3() {
     if (selectedServices.length === 0) return;
-    const staffId = selectedStaff === 'any' || !selectedStaff
-      ? 'any'
-      : selectedStaff.id;
-    loadSlots(selectedServices.map(s => s.id), staffId, date);
     setStep(3);
   }
 
-  function handleDateChange(newDate: string) {
-    setDate(newDate);
-    if (selectedServices.length === 0) return;
-    const staffId = selectedStaff === 'any' || !selectedStaff
-      ? 'any'
-      : selectedStaff.id;
-    loadSlots(selectedServices.map(s => s.id), staffId, newDate);
-  }
-
   function handleConfirm() {
-    if (selectedServices.length === 0 || !selectedSlot) return;
+    if (selectedServices.length === 0 || !availability?.available) return;
     if (!isSignedIn) return; // UI already shows sign-in prompt
 
     setBookingError(null);
     startBooking(async () => {
       try {
+        const slotStartObj = toIST(date, selectedTime);
+        const slotStartISO = slotStartObj.toISOString();
+        
         const appt = await createAppointmentAsCustomer(slug, {
           serviceIds: selectedServices.map(s => s.id),
           staffId:
             selectedStaff === 'any' || !selectedStaff
               ? undefined
               : selectedStaff.id,
-          slotStart: selectedSlot.slotStart,
+          slotStart: slotStartISO,
         });
         setBooked(appt);
       } catch (err) {
@@ -149,29 +159,26 @@ export function BookingFlow({
     });
   }
 
-  // Build sign-in link that carries in-progress booking selection (Bug 6 Fix)
+  // Build sign-in link that carries in-progress booking selection
   const signInParams = new URLSearchParams();
   if (selectedServices.length > 0) signInParams.set('serviceId', selectedServices.map(s => s.id).join(','));
   if (selectedStaff) {
     signInParams.set('staffId', selectedStaff === 'any' ? 'any' : selectedStaff.id);
   }
   if (date) signInParams.set('date', date);
-  if (selectedSlot) {
-    signInParams.set('slotStart', selectedSlot.slotStart);
-    signInParams.set('slotEnd', selectedSlot.slotEnd);
-  }
+  if (selectedTime) signInParams.set('time', selectedTime);
+  
   const signInHref = `/${slug}/sign-in?${signInParams.toString()}`;
 
   // ── Success state ────────────────────────────────────────────────────────
   if (booked) {
     const bookedAppt: AppointmentRow = booked;
-    // Build a relation-enriched version for TokenStubCard
     const enriched = {
       ...bookedAppt,
       services: selectedServices[0] ?? undefined,
       appointment_services: selectedServices.map(s => ({ services: s })),
       customers: null,
-      staff: selectedStaff ? staff.find((s) => s.id === selectedStaff) ?? null : null,
+      staff: selectedStaff && selectedStaff !== 'any' ? staff.find((s) => s.id === selectedStaff.id) ?? null : null,
     };
     return (
       <div className="flex flex-col items-center gap-6 px-4 py-8 text-center">
@@ -199,7 +206,6 @@ export function BookingFlow({
               setStep(1);
               setSelectedServices([]);
               setSelectedStaff('any');
-              setSelectedSlot(null);
             }}
           >
             Book another
@@ -214,7 +220,7 @@ export function BookingFlow({
       {/* ── Progress bar ────────────────────────────────────────── */}
       <div className="border-b border-border bg-background/50 px-4 py-3">
         <div className="flex items-center justify-between max-w-md mx-auto">
-          {STEPS.map(({ id, label, icon: Icon }) => {
+          {STEPS.map(({ id, label }) => {
             const isDone = step > id;
             const isCurrent = step === id;
             return (
@@ -428,8 +434,7 @@ export function BookingFlow({
             Available slots for {selectedServices.map(s => s.name).join(' + ')}
           </p>
 
-          {/* Date Picker Input */}
-          <div className="mb-4">
+          <div className="mb-6">
             <label className="text-xs font-medium text-muted-foreground block mb-1.5">
               Select date
             </label>
@@ -437,51 +442,46 @@ export function BookingFlow({
               type="date"
               value={date}
               min={today}
-              onChange={(e) => handleDateChange(e.target.value)}
+              onChange={(e) => setDate(e.target.value)}
               className="w-full rounded-lg border border-input bg-background px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-ring"
             />
           </div>
 
-          {/* Slots grid */}
-          {loadingSlots ? (
-            <div className="grid grid-cols-3 gap-2">
-              {Array.from({ length: 9 }).map((_, i) => (
-                <Skeleton key={i} className="h-10 rounded-lg" />
-              ))}
-            </div>
-          ) : slotError ? (
-            <div className="rounded-xl border border-border p-6 text-center text-xs text-muted-foreground">
-              {slotError}
-            </div>
-          ) : (
-            <div className="grid grid-cols-3 gap-2">
-              {slots.map((slot) => {
-                const isSelected = selectedSlot?.slotStart === slot.slotStart;
-                const timeLabel = formatISTTime(slot.slotStart);
-                return (
-                  <button
-                    key={slot.slotStart}
-                    type="button"
-                    onClick={() => setSelectedSlot(slot)}
-                    className={cn(
-                      'flex items-center justify-center rounded-lg border py-2.5 px-1 text-xs font-medium transition-all',
-                      'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
-                      isSelected
-                        ? 'border-primary bg-primary text-primary-foreground font-semibold shadow-xs'
-                        : 'border-border bg-card text-foreground hover:border-primary/50 hover:bg-accent/40'
-                    )}
-                  >
-                    {timeLabel}
-                  </button>
-                );
-              })}
-            </div>
-          )}
+          <div className="mb-6">
+            <ScrollTimePicker
+              label="Select time"
+              value={selectedTime}
+              onChange={setSelectedTime}
+              minTime={workingHours.start}
+              maxTime={workingHours.end}
+              minuteStep={5}
+            />
+          </div>
+
+          {/* Inline Availability Status */}
+          <div className="mb-4">
+            {checkingAvailability ? (
+              <div className="flex items-center gap-2 text-sm text-muted-foreground bg-muted/30 p-3 rounded-lg border border-border/50">
+                <Loader2 className="size-4 animate-spin" />
+                Checking availability…
+              </div>
+            ) : availability?.available ? (
+              <div className="flex items-center gap-2 text-sm text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/30 p-3 rounded-lg border border-emerald-200 dark:border-emerald-900">
+                <CheckCircle2 className="size-4" />
+                Time slot is available
+              </div>
+            ) : availability?.conflictReason ? (
+              <div className="flex items-center gap-2 text-sm text-destructive bg-destructive/10 p-3 rounded-lg border border-destructive/20">
+                <AlertCircle className="size-4 shrink-0" />
+                <span>{availability.conflictReason}</span>
+              </div>
+            ) : null}
+          </div>
 
           <div className="mt-6">
             <Button
               className="w-full"
-              disabled={!selectedSlot}
+              disabled={checkingAvailability || !availability?.available}
               onClick={() => setStep(4)}
             >
               Continue to Confirm →
@@ -503,7 +503,7 @@ export function BookingFlow({
             </div>
             <div className="flex justify-between text-sm">
               <span className="text-muted-foreground">Duration</span>
-              <span className="font-medium">{selectedServices.reduce((sum, s) => sum + s.duration_minutes, 0)} min</span>
+              <span className="font-medium">{totalDuration} min</span>
             </div>
             <div className="flex justify-between text-sm">
               <span className="text-muted-foreground">Staff</span>
@@ -520,9 +520,11 @@ export function BookingFlow({
             <div className="flex justify-between text-sm">
               <span className="text-muted-foreground">Time</span>
               <span className="font-medium">
-                {selectedSlot && formatISTTime(selectedSlot.slotStart)}
-                {selectedSlot && ' – '}
-                {selectedSlot && formatISTTime(selectedSlot.slotEnd)}
+                {(() => {
+                  const d = toIST(date, selectedTime);
+                  const end = new Date(d.getTime() + totalDuration * 60 * 1000);
+                  return `${formatISTTime(d.toISOString())} – ${formatISTTime(end.toISOString())}`;
+                })()}
               </span>
             </div>
             <div className="flex justify-between text-sm font-semibold border-t border-border pt-3 mt-1">

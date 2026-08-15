@@ -11,7 +11,7 @@ import { Label } from '@/components/ui/label';
 import { Button } from '@/components/ui/button';
 import { Separator } from '@/components/ui/separator';
 import { Building2, Users, Scissors } from 'lucide-react';
-import { ModeToggle } from '@/components/ui/theme-toggle';
+import { BusinessProfileForm } from './BusinessProfileForm';
 
 const DAYS = [
   { key: 'mon', label: 'Mon' },
@@ -71,65 +71,12 @@ export default async function SettingsPage({
 
         {/* ── Business Profile ─────────────────────────── */}
         <TabsContent value="profile" className="mt-4">
-          <form
-            className="flex flex-col gap-4"
-            action={async (formData: FormData) => {
-              'use server';
-              const name  = formData.get('name')  as string;
-              const start = formData.get('start') as string;
-              const end   = formData.get('end')   as string;
-              const selectedDays = DAYS
-                .filter((d) => formData.get(`day_${d.key}`) === 'on')
-                .map((d) => d.key);
-              await updateSalonSettings(salon.id, {
-                name,
-                workingHours: { start, end },
-                workingDays:  selectedDays,
-              });
-            }}
-          >
-            <div className="flex flex-col gap-1.5">
-              <Label htmlFor="salon-name" className="text-xs">Studio name</Label>
-              <Input
-                id="salon-name"
-                name="name"
-                defaultValue={salon.name}
-                required
-              />
-            </div>
-
-            <div className="grid grid-cols-2 gap-3">
-              <div className="flex flex-col gap-1.5">
-                <Label htmlFor="working-start" className="text-xs">Opens at</Label>
-                <Input id="working-start" name="start" type="time" defaultValue={wh.start} />
-              </div>
-              <div className="flex flex-col gap-1.5">
-                <Label htmlFor="working-end" className="text-xs">Closes at</Label>
-                <Input id="working-end" name="end" type="time" defaultValue={wh.end} />
-              </div>
-            </div>
-
-            <div className="flex flex-col gap-1.5">
-              <Label className="text-xs">Working days</Label>
-              <div className="flex flex-wrap gap-2">
-                {DAYS.map((d) => (
-                  <label key={d.key} className="flex items-center gap-1.5 cursor-pointer">
-                    <input
-                      type="checkbox"
-                      name={`day_${d.key}`}
-                      defaultChecked={salon.working_days.includes(d.key)}
-                      className="rounded border-border"
-                    />
-                    <span className="text-xs">{d.label}</span>
-                  </label>
-                ))}
-              </div>
-              <Label className="text-xs">Toggle Theme</Label>
-              <ModeToggle /> 
-            </div>
-
-            <Button type="submit" size="sm" className="self-start">Save changes</Button>
-          </form>
+          <BusinessProfileForm
+            salonId={salon.id}
+            defaultName={salon.name}
+            defaultWorkingHours={wh}
+            defaultWorkingDays={salon.working_days}
+          />
         </TabsContent>
 
         {/* ── Staff ────────────────────────────────────── */}

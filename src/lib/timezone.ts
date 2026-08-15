@@ -67,3 +67,21 @@ export function todayIST(): string {
   const istTime = new Date(d.getTime() + IST_OFFSET_MINUTES * 60 * 1000);
   return istTime.toISOString().split('T')[0];
 }
+
+/**
+ * Returns the current time in IST as a HH:MM string, rounded up to the nearest minuteStep (default 5).
+ */
+export function currentTimeIST(minuteStep = 5): string {
+  const d = new Date();
+  const istTime = new Date(d.getTime() + IST_OFFSET_MINUTES * 60 * 1000);
+  let h = istTime.getUTCHours();
+  let m = istTime.getUTCMinutes();
+
+  m = Math.ceil(m / minuteStep) * minuteStep;
+  if (m >= 60) {
+    m = 0;
+    h = (h + 1) % 24;
+  }
+  
+  return `${h.toString().padStart(2, '0')}:${m.toString().padStart(2, '0')}`;
+}

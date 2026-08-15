@@ -25,11 +25,12 @@ import {
   createAppointmentAsOwner,
   updateAppointmentDetails,
 } from '@/app/actions/owner/appointments';
-import { getAvailableSlots } from '@/app/actions/customer/booking';
+import { checkSlotAvailability } from '@/app/actions/customer/booking';
 import type { StaffRow, ServiceRow } from '@/lib/supabase/types';
 import type { AppointmentWithRelations } from '@/components/token-stub-card';
-import { CalendarDays, Clock, Plus, Pencil } from 'lucide-react';
-import { formatISTTime, todayIST } from '@/lib/timezone';
+import { CalendarDays, Clock, Plus, Pencil, Loader2, AlertCircle, CheckCircle2 } from 'lucide-react';
+import { todayIST, toIST, currentTimeIST } from '@/lib/timezone';
+import { ScrollTimePicker } from '@/components/scroll-time-picker';
 
 interface NewAppointmentModalProps {
   open: boolean;
@@ -38,6 +39,7 @@ interface NewAppointmentModalProps {
   salonSlug: string;
   staff: StaffRow[];
   services: ServiceRow[];
+  workingHours: { start: string; end: string };
   /** Optional existing appointment. When provided, the modal operates in EDIT mode. */
   appointment?: AppointmentWithRelations | null;
   /** Optional callback fired after a successful creation or update. */
@@ -51,6 +53,7 @@ export function NewAppointmentModal({
   salonSlug,
   staff,
   services,
+  workingHours,
   appointment,
   onSuccess,
 }: NewAppointmentModalProps) {
@@ -68,12 +71,17 @@ export function NewAppointmentModal({
   const [serviceId, setServiceId] = useState('');
   const [staffId, setStaffId] = useState('any');
   const [date, setDate] = useState(() => todayIST());
-  const [slotStart, setSlotStart] = useState('');
+  const [selectedTime, setSelectedTime] = useState(() => {
+    let init = currentTimeIST(5);
+    if (init < workingHours.start) init = workingHours.start;
+    if (init > workingHours.end) init = workingHours.end;
+    return init;
+  });
   const [notes, setNotes] = useState('');
 
-  // Available slots
-  const [slots, setSlots] = useState<{ slotStart: string; slotEnd: string }[]>([]);
-  const [loadingSlots, setLoadingSlots] = useState(false);
+  // Availability state
+  const [availability, setAvailability] = useState<{ available: boolean; conflictReason?: string } | null>(null);
+  const [checkingAvailability, setCheckingAvailability] = useState(false);
 
   // Initialize or reset form state on open / appointment change
   useEffect(() => {
@@ -84,12 +92,15 @@ export function NewAppointmentModal({
         setClientEmail(appointment.customers?.email ?? '');
         setServiceId(appointment.service_id);
         setStaffId(appointment.staff_id ?? 'any');
-        setDate(
-          appointment.slot_start
-            ? appointment.slot_start.split('T')[0]
-            : todayIST()
-        );
-        setSlotStart(appointment.slot_start);
+        
+        const apptDate = appointment.slot_start ? new Date(appointment.slot_start) : new Date();
+        const yyyyMmDd = appointment.slot_start ? appointment.slot_start.split('T')[0] : todayIST();
+        setDate(yyyyMmDd);
+        
+        const h = apptDate.getHours();
+        const m = apptDate.getMinutes();
+        setSelectedTime(`${h.toString().padStart(2, '0')}:${m.toString().padStart(2, '0')}`);
+        
         setNotes(appointment.notes ?? '');
       } else {
         setClientName('');
@@ -98,59 +109,60 @@ export function NewAppointmentModal({
         setServiceId('');
         setStaffId('any');
         setDate(todayIST());
-        setSlotStart('');
+        let init = currentTimeIST(5);
+        if (init < workingHours.start) init = workingHours.start;
+        if (init > workingHours.end) init = workingHours.end;
+        setSelectedTime(init);
         setNotes('');
       }
       setError(null);
       setSuccess(false);
+      setAvailability(null);
     }
-  }, [open, appointment]);
+  }, [open, appointment, workingHours.start]);
 
-  // Reload available slots whenever service, staff, or date changes
+  const selectedService = services.find((s) => s.id === serviceId);
+
+  // Debounced availability check
   useEffect(() => {
-    if (!serviceId || !date) {
-      setSlots([]);
-      return;
-    }
-    setLoadingSlots(true);
+    if (!open || !serviceId || !date || !selectedTime) return;
 
-    getAvailableSlots(salonSlug, [serviceId], staffId, date)
-      .then((fetchedSlots) => {
-        let combined = [...fetchedSlots];
+    setCheckingAvailability(true);
+    setAvailability(null);
+    setError(null);
 
-        // In edit mode: if the date matches the appointment's existing slot,
-        // ensure its own current slot is available in the list so it doesn't conflict with itself.
-        if (
-          isEdit &&
-          appointment &&
-          appointment.slot_start.split('T')[0] === date &&
-          (staffId === 'any' || !appointment.staff_id || staffId === appointment.staff_id)
-        ) {
-          const hasCurrentSlot = combined.some(
-            (s) => s.slotStart === appointment.slot_start
-          );
-          if (!hasCurrentSlot) {
-            combined = [
-              { slotStart: appointment.slot_start, slotEnd: appointment.slot_end },
-              ...combined,
-            ].sort(
-              (a, b) =>
-                new Date(a.slotStart).getTime() - new Date(b.slotStart).getTime()
-            );
-          }
-        }
+    const timer = setTimeout(async () => {
+      try {
+        const duration = selectedService?.duration_minutes ?? 0;
+        const res = await checkSlotAvailability(
+          salonSlug,
+          staffId,
+          date,
+          selectedTime,
+          duration,
+          isEdit ? appointment?.id : undefined
+        );
+        setAvailability(res);
+      } catch (err) {
+        setAvailability({ available: false, conflictReason: 'Failed to check availability.' });
+      } finally {
+        setCheckingAvailability(false);
+      }
+    }, 500);
 
-        setSlots(combined);
-      })
-      .catch(() => setSlots([]))
-      .finally(() => setLoadingSlots(false));
-  }, [serviceId, staffId, date, salonSlug, isEdit, appointment]);
+    return () => clearTimeout(timer);
+  }, [open, serviceId, staffId, date, selectedTime, selectedService, salonSlug, isEdit, appointment]);
 
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
 
-    if (!serviceId || !slotStart) {
-      setError('Please choose a service and a time slot.');
+    if (!serviceId) {
+      setError('Please choose a service.');
+      return;
+    }
+
+    if (!availability?.available) {
+      setError('Selected time is not available.');
       return;
     }
 
@@ -165,30 +177,20 @@ export function NewAppointmentModal({
     }
     setError(null);
 
-    let chosenSlot = slots.find((s) => s.slotStart === slotStart);
-    if (!chosenSlot && isEdit && appointment && appointment.slot_start === slotStart) {
-      chosenSlot = {
-        slotStart: appointment.slot_start,
-        slotEnd: appointment.slot_end,
-      };
-    }
-
-    if (!chosenSlot) {
-      setError('This time is no longer available. Please select another slot.');
-      return;
-    }
-
     startTransition(async () => {
       try {
+        const duration = selectedService?.duration_minutes ?? 0;
+        const slotStartObj = toIST(date, selectedTime);
+        const slotEndObj = new Date(slotStartObj.getTime() + duration * 60 * 1000);
+
         if (isEdit && appointment) {
-          // Edit existing appointment
           await updateAppointmentDetails({
             appointmentId: appointment.id,
             salonId,
             serviceIds: [serviceId],
             staffId: staffId === 'any' ? undefined : staffId,
-            slotStart: chosenSlot.slotStart,
-            slotEnd: chosenSlot.slotEnd,
+            slotStart: slotStartObj.toISOString(),
+            slotEnd: slotEndObj.toISOString(),
             notes: notes || undefined,
           });
 
@@ -199,7 +201,6 @@ export function NewAppointmentModal({
             onOpenChange(false);
           }, 1000);
         } else {
-          // Create new appointment
           const customer = await upsertCustomer(salonId, {
             name: clientName,
             phone: clientPhone,
@@ -211,8 +212,8 @@ export function NewAppointmentModal({
             customerId: customer.id,
             serviceIds: [serviceId],
             staffId: staffId === 'any' ? undefined : staffId,
-            slotStart: chosenSlot.slotStart,
-            slotEnd: chosenSlot.slotEnd,
+            slotStart: slotStartObj.toISOString(),
+            slotEnd: slotEndObj.toISOString(),
             notes: notes || undefined,
           });
 
@@ -228,8 +229,6 @@ export function NewAppointmentModal({
       }
     });
   }
-
-  const selectedService = services.find((s) => s.id === serviceId);
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -371,53 +370,53 @@ export function NewAppointmentModal({
                 type="date"
                 value={date}
                 min={todayIST()}
-                onChange={(e) => {
-                  setDate(e.target.value);
-                  setSlotStart('');
-                }}
+                onChange={(e) => setDate(e.target.value)}
                 required
               />
             </div>
 
             {/* Time slot */}
-            <div className="flex flex-col gap-1.5">
-              <Label className="text-xs flex items-center gap-1">
+            <div className="flex flex-col gap-1.5 mt-2">
+              <Label className="text-xs flex items-center gap-1 mb-1">
                 <Clock className="size-3" /> Time slot *
               </Label>
               {!serviceId ? (
                 <p className="text-xs text-muted-foreground">Choose a service first</p>
-              ) : loadingSlots ? (
-                <p className="text-xs text-muted-foreground">Loading slots…</p>
-              ) : slots.length === 0 ? (
-                <p className="text-xs text-muted-foreground">
-                  No available slots on this date — try a different day or staff member.
-                </p>
               ) : (
-                <div className="flex flex-wrap gap-1.5">
-                  {slots.map((s) => {
-                    const label = formatISTTime(s.slotStart);
-                    const selected = slotStart === s.slotStart;
-                    return (
-                      <button
-                        key={s.slotStart}
-                        type="button"
-                        onClick={() => setSlotStart(s.slotStart)}
-                        className={`rounded-md border px-2.5 py-1 text-xs transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${
-                          selected
-                            ? 'border-primary bg-primary text-primary-foreground'
-                            : 'border-border bg-background text-foreground hover:bg-muted'
-                        }`}
-                      >
-                        {label}
-                      </button>
-                    );
-                  })}
-                </div>
+                <>
+                  <ScrollTimePicker
+                    value={selectedTime}
+                    onChange={setSelectedTime}
+                    minTime={workingHours.start}
+                    maxTime={workingHours.end}
+                    minuteStep={5}
+                  />
+
+                  {/* Inline Availability Status */}
+                  <div className="mt-2">
+                    {checkingAvailability ? (
+                      <div className="flex items-center gap-2 text-xs text-muted-foreground bg-muted/30 p-2 rounded border border-border/50">
+                        <Loader2 className="size-3 animate-spin" />
+                        Checking availability…
+                      </div>
+                    ) : availability?.available ? (
+                      <div className="flex items-center gap-2 text-xs text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/30 p-2 rounded border border-emerald-200 dark:border-emerald-900">
+                        <CheckCircle2 className="size-3" />
+                        Time slot is available
+                      </div>
+                    ) : availability?.conflictReason ? (
+                      <div className="flex items-center gap-2 text-xs text-destructive bg-destructive/10 p-2 rounded border border-destructive/20">
+                        <AlertCircle className="size-3 shrink-0" />
+                        <span>{availability.conflictReason}</span>
+                      </div>
+                    ) : null}
+                  </div>
+                </>
               )}
             </div>
 
             {/* Notes */}
-            <div className="flex flex-col gap-1.5">
+            <div className="flex flex-col gap-1.5 mt-2">
               <Label htmlFor="nm-notes" className="text-xs">
                 Notes (optional)
               </Label>
@@ -432,12 +431,12 @@ export function NewAppointmentModal({
             </div>
 
             {error && (
-              <p className="rounded-md border border-destructive/30 bg-destructive/5 px-3 py-2 text-xs text-destructive">
+              <p className="rounded-md border border-destructive/30 bg-destructive/5 px-3 py-2 text-xs text-destructive mt-2">
                 {error}
               </p>
             )}
 
-            <DialogFooter className="gap-2">
+            <DialogFooter className="gap-2 mt-2">
               <Button
                 type="button"
                 variant="outline"
@@ -446,7 +445,7 @@ export function NewAppointmentModal({
               >
                 Cancel
               </Button>
-              <Button type="submit" disabled={isPending || !slotStart}>
+              <Button type="submit" disabled={isPending || checkingAvailability || !availability?.available}>
                 {isPending
                   ? isEdit
                     ? 'Saving…'

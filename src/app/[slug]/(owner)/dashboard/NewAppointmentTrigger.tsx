@@ -11,6 +11,7 @@ interface NewAppointmentTriggerProps {
   salonSlug: string;
   staff: StaffRow[];
   services: ServiceRow[];
+  workingHours: { start: string; end: string };
 }
 
 export function NewAppointmentTrigger({
@@ -18,6 +19,7 @@ export function NewAppointmentTrigger({
   salonSlug,
   staff,
   services,
+  workingHours,
 }: NewAppointmentTriggerProps) {
   const [open, setOpen] = useState(false);
 
@@ -38,7 +40,9 @@ export function NewAppointmentTrigger({
         salonSlug={salonSlug}
         staff={staff}
         services={services}
+        workingHours={workingHours}
       />
     </>
   );
 }
+

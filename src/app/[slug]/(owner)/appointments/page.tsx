@@ -41,7 +41,7 @@ export default async function AppointmentsPage({
   const supabase = createClerkSupabaseClient();
   const { data: salonData } = await supabase
     .from('salons')
-    .select('id, name')
+    .select('id, name, working_hours')
     .eq('slug', slug)
     .single();
   const salon = salonData as SalonRow | null;
@@ -77,6 +77,7 @@ export default async function AppointmentsPage({
             salonSlug={slug}
             staff={staff}
             services={services}
+            workingHours={salon.working_hours as { start: string; end: string }}
           />
         )}
       </div>
@@ -111,6 +112,7 @@ export default async function AppointmentsPage({
                       salonId={salon.id}
                       staff={staff}
                       services={services}
+                      workingHours={salon.working_hours as { start: string; end: string }}
                     />
                   ) : undefined
                 }
