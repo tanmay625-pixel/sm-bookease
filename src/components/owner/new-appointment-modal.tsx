@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useTransition, useEffect } from 'react';
+import { useState, useTransition, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import {
@@ -31,6 +31,18 @@ import type { AppointmentWithRelations } from '@/components/token-stub-card';
 import { CalendarDays, Clock, Plus, Pencil, Loader2, AlertCircle, CheckCircle2 } from 'lucide-react';
 import { todayIST, toIST, currentTimeIST } from '@/lib/timezone';
 import { ScrollTimePicker } from '@/components/scroll-time-picker';
+import {
+  Combobox,
+  ComboboxChips,
+  ComboboxChip,
+  ComboboxChipsInput,
+  ComboboxContent,
+  ComboboxList,
+  ComboboxItem,
+  ComboboxEmpty,
+  ComboboxValue,
+  useComboboxAnchor,
+} from '@/components/ui/combobox';
 
 interface NewAppointmentModalProps {
   open: boolean;
@@ -68,7 +80,7 @@ export function NewAppointmentModal({
   const [clientName, setClientName] = useState('');
   const [clientPhone, setClientPhone] = useState('');
   const [clientEmail, setClientEmail] = useState('');
-  const [serviceId, setServiceId] = useState('');
+  const [selectedServiceIds, setSelectedServiceIds] = useState<string[]>([]);
   const [staffId, setStaffId] = useState('any');
   const [date, setDate] = useState(() => todayIST());
   const [selectedTime, setSelectedTime] = useState(() => {
@@ -82,6 +94,7 @@ export function NewAppointmentModal({
   // Availability state
   const [availability, setAvailability] = useState<{ available: boolean; conflictReason?: string } | null>(null);
   const [checkingAvailability, setCheckingAvailability] = useState(false);
+  const anchorRef = useComboboxAnchor();
 
   // Initialize or reset form state on open / appointment change
   useEffect(() => {
@@ -90,7 +103,12 @@ export function NewAppointmentModal({
         setClientName(appointment.customers?.name ?? '');
         setClientPhone(appointment.customers?.phone ?? '');
         setClientEmail(appointment.customers?.email ?? '');
-        setServiceId(appointment.service_id);
+        const initIds = appointment.appointment_services?.length
+          ? appointment.appointment_services
+              .map((as) => as.services?.id)
+              .filter((id): id is string => Boolean(id))
+          : [appointment.service_id];
+        setSelectedServiceIds(initIds);
         setStaffId(appointment.staff_id ?? 'any');
         
         const apptDate = appointment.slot_start ? new Date(appointment.slot_start) : new Date();
@@ -106,7 +124,7 @@ export function NewAppointmentModal({
         setClientName('');
         setClientPhone('');
         setClientEmail('');
-        setServiceId('');
+        setSelectedServiceIds([]);
         setStaffId('any');
         setDate(todayIST());
         let init = currentTimeIST(5);
@@ -121,11 +139,13 @@ export function NewAppointmentModal({
     }
   }, [open, appointment, workingHours.start]);
 
-  const selectedService = services.find((s) => s.id === serviceId);
+  const selectedServices = services.filter((s) => selectedServiceIds.includes(s.id));
+  const totalDuration = selectedServices.reduce((sum, s) => sum + s.duration_minutes, 0);
+  const totalPrice = selectedServices.reduce((sum, s) => sum + Number(s.price), 0);
 
   // Debounced availability check
   useEffect(() => {
-    if (!open || !serviceId || !date || !selectedTime) return;
+    if (!open || selectedServiceIds.length === 0 || !date || !selectedTime) return;
 
     setCheckingAvailability(true);
     setAvailability(null);
@@ -133,13 +153,12 @@ export function NewAppointmentModal({
 
     const timer = setTimeout(async () => {
       try {
-        const duration = selectedService?.duration_minutes ?? 0;
         const res = await checkSlotAvailability(
           salonSlug,
           staffId,
           date,
           selectedTime,
-          duration,
+          totalDuration,
           isEdit ? appointment?.id : undefined
         );
         setAvailability(res);
@@ -151,13 +170,13 @@ export function NewAppointmentModal({
     }, 500);
 
     return () => clearTimeout(timer);
-  }, [open, serviceId, staffId, date, selectedTime, selectedService, salonSlug, isEdit, appointment]);
+  }, [open, selectedServiceIds, staffId, date, selectedTime, totalDuration, salonSlug, isEdit, appointment]);
 
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
 
-    if (!serviceId) {
-      setError('Please choose a service.');
+    if (selectedServiceIds.length === 0) {
+      setError('Please choose at least one service.');
       return;
     }
 
@@ -179,15 +198,14 @@ export function NewAppointmentModal({
 
     startTransition(async () => {
       try {
-        const duration = selectedService?.duration_minutes ?? 0;
         const slotStartObj = toIST(date, selectedTime);
-        const slotEndObj = new Date(slotStartObj.getTime() + duration * 60 * 1000);
+        const slotEndObj = new Date(slotStartObj.getTime() + totalDuration * 60 * 1000);
 
         if (isEdit && appointment) {
           await updateAppointmentDetails({
             appointmentId: appointment.id,
             salonId,
-            serviceIds: [serviceId],
+            serviceIds: selectedServiceIds,
             staffId: staffId === 'any' ? undefined : staffId,
             slotStart: slotStartObj.toISOString(),
             slotEnd: slotEndObj.toISOString(),
@@ -210,7 +228,7 @@ export function NewAppointmentModal({
           await createAppointmentAsOwner({
             salonId,
             customerId: customer.id,
-            serviceIds: [serviceId],
+            serviceIds: selectedServiceIds,
             staffId: staffId === 'any' ? undefined : staffId,
             slotStart: slotStartObj.toISOString(),
             slotEnd: slotEndObj.toISOString(),
@@ -230,9 +248,20 @@ export function NewAppointmentModal({
     });
   }
 
+  const [comboboxContainer, setComboboxContainer] = useState<HTMLElement | null>(null);
+
+  const dialogContentRef = useCallback((node: HTMLElement | null) => {
+    if (node) {
+      const portal = node.closest('[data-slot="dialog-portal"]') as HTMLElement;
+      setComboboxContainer(portal || node);
+    } else {
+      setComboboxContainer(null);
+    }
+  }, []);
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-lg">
+      <DialogContent ref={dialogContentRef} className="max-h-[90vh] overflow-y-auto sm:max-w-lg">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2 text-base">
             {isEdit ? <Pencil className="size-4" /> : <Plus className="size-4" />}
@@ -307,57 +336,79 @@ export function NewAppointmentModal({
               </div>
             </fieldset>
 
-            {/* Service + Staff */}
-            <div className="grid grid-cols-2 gap-3">
-              <div className="flex flex-col gap-1.5">
-                <div className="flex items-center justify-between">
-                  <Label htmlFor="nm-service" className="text-xs">
-                    Service {!isEdit && '*'}
-                  </Label>
-                  {isEdit && (
-                    <span className="text-[10px] text-muted-foreground uppercase font-medium bg-muted px-1.5 py-0.5 rounded">
-                      Read-only
-                    </span>
-                  )}
-                </div>
-                {isEdit ? (
-                  <div className="flex h-9 w-full items-center rounded-md border border-input bg-muted/50 px-3 py-1 text-xs text-muted-foreground">
-                    {selectedService ? `${selectedService.name} · ${selectedService.duration_minutes}m` : 'Selected Service'}
-                  </div>
-                ) : (
-                  <Select value={serviceId} onValueChange={setServiceId} required>
-                    <SelectTrigger id="nm-service">
-                      <SelectValue placeholder="Pick service…" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {services.map((s) => (
-                        <SelectItem key={s.id} value={s.id}>
-                          {s.name} · {s.duration_minutes}min
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+            {/* Service(s) */}
+            <fieldset className="flex flex-col gap-2">
+              <div className="flex items-center justify-between">
+                <Label className="text-xs">
+                  Service{selectedServiceIds.length > 1 ? 's' : ''} *
+                </Label>
+                {selectedServices.length > 0 && (
+                  <span className="text-[10px] text-muted-foreground font-medium">
+                    {totalDuration}min · ₹{totalPrice}
+                  </span>
                 )}
               </div>
+              <Combobox
+                multiple
+                value={selectedServiceIds}
+                onValueChange={(newValue) => setSelectedServiceIds(newValue)}
+                itemToStringLabel={(id) => services.find(s => s.id === id)?.name ?? ''}
+                items={services.map((s) => s.id)}
+              >
+                <ComboboxChips ref={anchorRef}>
+                  <ComboboxValue>
+                    {(values: string[]) => (
+                      <>
+                        {values.map((id) => {
+                          const svc = services.find(s => s.id === id);
+                          return svc ? (
+                            <ComboboxChip key={id}>
+                              {svc.name}
+                            </ComboboxChip>
+                          ) : null;
+                        })}
+                        <ComboboxChipsInput placeholder={values.length > 0 ? '' : 'Search services…'} />
+                      </>
+                    )}
+                  </ComboboxValue>
+                </ComboboxChips>
+                <ComboboxContent anchor={anchorRef} container={comboboxContainer}>
+                  <ComboboxList>
+                    {(id: string) => {
+                      const svc = services.find((s) => s.id === id);
+                      return svc ? (
+                        <ComboboxItem key={id} value={id}>
+                          <span className="flex-1">{svc.name}</span>
+                          <span className="tabular-nums text-muted-foreground ml-auto mr-5">
+                            {svc.duration_minutes}m · ₹{svc.price}
+                          </span>
+                        </ComboboxItem>
+                      ) : null;
+                    }}
+                  </ComboboxList>
+                  <ComboboxEmpty>No services found</ComboboxEmpty>
+                </ComboboxContent>
+              </Combobox>
+            </fieldset>
 
-              <div className="flex flex-col gap-1.5">
-                <Label htmlFor="nm-staff" className="text-xs">
-                  Staff
-                </Label>
-                <Select value={staffId} onValueChange={setStaffId}>
-                  <SelectTrigger id="nm-staff">
-                    <SelectValue placeholder="Any available" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="any">Any available</SelectItem>
-                    {staff.map((s) => (
-                      <SelectItem key={s.id} value={s.id}>
-                        {s.name}{s.role ? ` · ${s.role}` : ''}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
+            {/* Staff */}
+            <div className="flex flex-col gap-1.5">
+              <Label htmlFor="nm-staff" className="text-xs">
+                Staff
+              </Label>
+              <Select value={staffId} onValueChange={setStaffId}>
+                <SelectTrigger id="nm-staff">
+                  <SelectValue placeholder="Any available" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="any">Any available</SelectItem>
+                  {staff.map((s) => (
+                    <SelectItem key={s.id} value={s.id}>
+                      {s.name}{s.role ? ` · ${s.role}` : ''}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
 
             {/* Date */}
@@ -380,7 +431,7 @@ export function NewAppointmentModal({
               <Label className="text-xs flex items-center gap-1 mb-1">
                 <Clock className="size-3" /> Time slot *
               </Label>
-              {!serviceId ? (
+              {selectedServiceIds.length === 0 ? (
                 <p className="text-xs text-muted-foreground">Choose a service first</p>
               ) : (
                 <>
