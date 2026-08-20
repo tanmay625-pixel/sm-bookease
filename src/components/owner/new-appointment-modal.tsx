@@ -56,6 +56,10 @@ interface NewAppointmentModalProps {
   appointment?: AppointmentWithRelations | null;
   /** Optional callback fired after a successful creation or update. */
   onSuccess?: () => void;
+  /** Optional prefilled date for new appointments (YYYY-MM-DD) */
+  initialDate?: string;
+  /** Optional prefilled time for new appointments (HH:MM) */
+  initialTime?: string;
 }
 
 export function NewAppointmentModal({
@@ -68,6 +72,8 @@ export function NewAppointmentModal({
   workingHours,
   appointment,
   onSuccess,
+  initialDate,
+  initialTime,
 }: NewAppointmentModalProps) {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
@@ -126,18 +132,22 @@ export function NewAppointmentModal({
         setClientEmail('');
         setSelectedServiceIds([]);
         setStaffId('any');
-        setDate(todayIST());
-        let init = currentTimeIST(5);
-        if (init < workingHours.start) init = workingHours.start;
-        if (init > workingHours.end) init = workingHours.end;
-        setSelectedTime(init);
+        setDate(initialDate || todayIST());
+        if (initialTime) {
+          setSelectedTime(initialTime);
+        } else {
+          let init = currentTimeIST(5);
+          if (init < workingHours.start) init = workingHours.start;
+          if (init > workingHours.end) init = workingHours.end;
+          setSelectedTime(init);
+        }
         setNotes('');
       }
       setError(null);
       setSuccess(false);
       setAvailability(null);
     }
-  }, [open, appointment, workingHours.start]);
+  }, [open, appointment, workingHours.start, initialDate, initialTime]);
 
   const selectedServices = services.filter((s) => selectedServiceIds.includes(s.id));
   const totalDuration = selectedServices.reduce((sum, s) => sum + s.duration_minutes, 0);

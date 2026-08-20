@@ -213,6 +213,8 @@ export function WeekView({
   const [modalOpen, setModalOpen] = useState(false);
   const [modalAppointment, setModalAppointment] =
     useState<AppointmentWithRelations | null>(null);
+  const [modalInitialDate, setModalInitialDate] = useState<string | undefined>(undefined);
+  const [modalInitialTime, setModalInitialTime] = useState<string | undefined>(undefined);
   const [now, setNow] = useState(() => new Date());
 
   // Appointments state — initialised from server-rendered props, re-fetched on week nav
@@ -350,7 +352,7 @@ export function WeekView({
 
   // ---- day column click (empty slot) ----------------------------------------
   const handleDayClick = useCallback(
-    (dayDate: Date, _e: React.MouseEvent<HTMLDivElement>) => {
+    (dayDate: Date, e: React.MouseEvent<HTMLDivElement>) => {
       const todayStart = new Date();
       todayStart.setHours(0, 0, 0, 0);
       const clickedDay = new Date(dayDate);
@@ -358,11 +360,29 @@ export function WeekView({
       if (clickedDay < todayStart) {
         return;
       }
-      // Open modal in create mode — the user will select service/staff/date/time inside
+
+      const rect = e.currentTarget.getBoundingClientRect();
+      const y = e.clientY - rect.top;
+      const minutesFromStart = (y / HOUR_HEIGHT) * 60;
+      let clickedMin = dayStartMin + minutesFromStart;
+      
+      // Round to nearest SLOT_INTERVAL (e.g. 30 mins, but let's say 30 mins)
+      clickedMin = Math.floor(clickedMin / SLOT_INTERVAL) * SLOT_INTERVAL;
+      
+      if (clickedMin < dayStartMin) clickedMin = dayStartMin;
+      if (clickedMin > dayEndMin) clickedMin = dayEndMin;
+
+      const hhmm = minutesToHHMM(clickedMin);
+
+      const istParts = getISTDateParts(dayDate);
+      const yyyyMmDd = `${istParts.year}-${String(istParts.month + 1).padStart(2, '0')}-${String(istParts.date).padStart(2, '0')}`;
+
+      setModalInitialDate(yyyyMmDd);
+      setModalInitialTime(hhmm);
       setModalAppointment(null);
       setModalOpen(true);
     },
-    [],
+    [dayStartMin, dayEndMin],
   );
 
   // ---- appointment block click ----------------------------------------------
@@ -438,6 +458,8 @@ export function WeekView({
           size="sm"
           onClick={() => {
             setModalAppointment(null);
+            setModalInitialDate(undefined);
+            setModalInitialTime(undefined);
             setModalOpen(true);
           }}
         >
@@ -608,38 +630,68 @@ export function WeekView({
                           return (
                             <div
                               key={appointment.id}
-                              className={cn(
-                                'absolute z-10 overflow-hidden rounded-md border-l-[3px] px-1 py-0.5 transition-opacity',
-                                isPast
-                                  ? 'cursor-default opacity-75'
-                                  : 'cursor-pointer hover:opacity-90',
-                                sc.border,
-                                sc.bg,
-                              )}
-                              title={
-                                isPast
-                                  ? 'Past appointment (read-only)'
-                                  : undefined
-                              }
+                              className="absolute z-10 group"
                               style={{
                                 top,
                                 height,
                                 width: `${widthPct}%`,
                                 left: `${leftPct}%`,
                               }}
-                              onClick={(e) =>
-                                handleBlockClick(appointment, e)
-                              }
                             >
-                              <p className="truncate text-[10px] font-bold leading-tight">
-                                {serviceName}
-                              </p>
-                              <p className="truncate text-[10px] leading-tight text-muted-foreground">
-                                {customerName}
-                              </p>
-                              <p className="truncate text-[9px] leading-tight text-muted-foreground">
-                                {timeLabel}
-                              </p>
+                              <div
+                                className={cn(
+                                  'h-full w-full overflow-hidden rounded-md border-l-[3px] px-1 py-0.5 transition-opacity',
+                                  isPast
+                                    ? 'cursor-default opacity-75'
+                                    : 'cursor-pointer hover:opacity-90',
+                                  sc.border,
+                                  sc.bg,
+                                )}
+                                onClick={(e) =>
+                                  handleBlockClick(appointment, e)
+                                }
+                              >
+                                <p className="truncate text-[10px] font-bold leading-tight">
+                                  {serviceName}
+                                </p>
+                                <p className="truncate text-[10px] leading-tight text-muted-foreground">
+                                  {customerName}
+                                </p>
+                                <p className="truncate text-[9px] leading-tight text-muted-foreground">
+                                  {timeLabel}
+                                </p>
+                              </div>
+
+                              {/* Hover popup */}
+                              <div
+                                className={cn(
+                                  'absolute top-0 hidden w-56 rounded-md bg-popover p-3 text-xs text-popover-foreground shadow-lg ring-1 ring-border group-hover:block z-50 animate-in fade-in',
+                                  dayIdx >= 4 ? 'right-full mr-1' : 'left-full ml-1'
+                                )}
+                              >
+                                <div className="font-bold text-sm mb-1">{serviceName}</div>
+                                <div className="text-muted-foreground mb-2">{timeLabel}</div>
+                                <div className="grid grid-cols-[auto_1fr] gap-x-2 gap-y-1">
+                                  <span className="font-semibold text-muted-foreground">Client:</span>
+                                  <span>{customerName}</span>
+                                  <span className="font-semibold text-muted-foreground">Phone:</span>
+                                  <span>{appointment.customers?.phone || 'N/A'}</span>
+                                  <span className="font-semibold text-muted-foreground">Staff:</span>
+                                  <span>{appointment.staff?.name || 'Any'}</span>
+                                  <span className="font-semibold text-muted-foreground">Status:</span>
+                                  <span className="capitalize">{appointment.status}</span>
+                                </div>
+                                {appointment.notes && (
+                                  <div className="mt-2 border-t border-border/50 pt-2 text-muted-foreground">
+                                    <span className="font-semibold text-foreground">Notes:</span> {appointment.notes}
+                                  </div>
+                                )}
+                                {isPast && (
+                                  <div className="mt-2 text-amber-600 dark:text-amber-500 font-medium border-t border-border/50 pt-2">
+                                    Past appointment (read-only)
+                                  </div>
+                                )}
+                              </div>
                             </div>
                           );
                         },
@@ -667,6 +719,8 @@ export function WeekView({
         services={services}
         workingHours={workingHours as { start: string; end: string }}
         appointment={modalAppointment}
+        initialDate={modalInitialDate}
+        initialTime={modalInitialTime}
         onSuccess={() => {
           // Re-fetch current week after create/edit
           const weekStartStr = weekStart.toISOString().split('T')[0];
