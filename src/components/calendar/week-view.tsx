@@ -4,6 +4,7 @@ import { useState, useMemo, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { NewAppointmentModal } from '@/components/owner/new-appointment-modal';
+import { AppointmentDetailsModal } from '@/components/owner/appointment-details-modal';
 import {
   listAppointments,
   type AppointmentWithRelations,
@@ -215,6 +216,11 @@ export function WeekView({
     useState<AppointmentWithRelations | null>(null);
   const [modalInitialDate, setModalInitialDate] = useState<string | undefined>(undefined);
   const [modalInitialTime, setModalInitialTime] = useState<string | undefined>(undefined);
+
+  // Details modal (for clicking existing appointment blocks)
+  const [detailsOpen, setDetailsOpen] = useState(false);
+  const [detailsAppointment, setDetailsAppointment] =
+    useState<AppointmentWithRelations | null>(null);
   const [now, setNow] = useState(() => new Date());
 
   // Appointments state — initialised from server-rendered props, re-fetched on week nav
@@ -389,12 +395,9 @@ export function WeekView({
   const handleBlockClick = useCallback(
     (appt: AppointmentWithRelations, e: React.MouseEvent) => {
       e.stopPropagation(); // prevent day-column click
-      const isPast = new Date(appt.slot_start).getTime() <= Date.now();
-      if (isPast) {
-        return;
-      }
-      setModalAppointment(appt);
-      setModalOpen(true);
+      // Open details modal for all appointments (past = read-only, future = editable)
+      setDetailsAppointment(appt);
+      setDetailsOpen(true);
     },
     [],
   );
@@ -640,10 +643,8 @@ export function WeekView({
                             >
                               <div
                                 className={cn(
-                                  'h-full w-full overflow-hidden rounded-md border-l-[3px] px-1 py-0.5 transition-opacity',
-                                  isPast
-                                    ? 'cursor-default opacity-75'
-                                    : 'cursor-pointer hover:opacity-90',
+                                  'h-full w-full overflow-hidden rounded-md border-l-[3px] px-1 py-0.5 transition-opacity cursor-pointer hover:opacity-90',
+                                  isPast ? 'opacity-75' : '',
                                   sc.border,
                                   sc.bg,
                                 )}
@@ -661,37 +662,6 @@ export function WeekView({
                                   {timeLabel}
                                 </p>
                               </div>
-
-                              {/* Hover popup */}
-                              <div
-                                className={cn(
-                                  'absolute top-0 hidden w-56 rounded-md bg-popover p-3 text-xs text-popover-foreground shadow-lg ring-1 ring-border group-hover:block z-50 animate-in fade-in',
-                                  dayIdx >= 4 ? 'right-full mr-1' : 'left-full ml-1'
-                                )}
-                              >
-                                <div className="font-bold text-sm mb-1">{serviceName}</div>
-                                <div className="text-muted-foreground mb-2">{timeLabel}</div>
-                                <div className="grid grid-cols-[auto_1fr] gap-x-2 gap-y-1">
-                                  <span className="font-semibold text-muted-foreground">Client:</span>
-                                  <span>{customerName}</span>
-                                  <span className="font-semibold text-muted-foreground">Phone:</span>
-                                  <span>{appointment.customers?.phone || 'N/A'}</span>
-                                  <span className="font-semibold text-muted-foreground">Staff:</span>
-                                  <span>{appointment.staff?.name || 'Any'}</span>
-                                  <span className="font-semibold text-muted-foreground">Status:</span>
-                                  <span className="capitalize">{appointment.status}</span>
-                                </div>
-                                {appointment.notes && (
-                                  <div className="mt-2 border-t border-border/50 pt-2 text-muted-foreground">
-                                    <span className="font-semibold text-foreground">Notes:</span> {appointment.notes}
-                                  </div>
-                                )}
-                                {isPast && (
-                                  <div className="mt-2 text-amber-600 dark:text-amber-500 font-medium border-t border-border/50 pt-2">
-                                    Past appointment (read-only)
-                                  </div>
-                                )}
-                              </div>
                             </div>
                           );
                         },
@@ -704,7 +674,7 @@ export function WeekView({
         </div>
       </div>
 
-      {/* ===== Modal ===== */}
+      {/* ===== New Appointment Modal (empty slot click) ===== */}
       <NewAppointmentModal
         open={modalOpen}
         onOpenChange={(open) => {
@@ -722,7 +692,6 @@ export function WeekView({
         initialDate={modalInitialDate}
         initialTime={modalInitialTime}
         onSuccess={() => {
-          // Re-fetch current week after create/edit
           const weekStartStr = weekStart.toISOString().split('T')[0];
           const sunday = addDays(weekStart, 6);
           const weekEndStr = sunday.toISOString().split('T')[0];
@@ -733,6 +702,33 @@ export function WeekView({
           router.refresh();
         }}
       />
+
+      {/* ===== Details Modal (block click) ===== */}
+      {detailsAppointment && (
+        <AppointmentDetailsModal
+          appointment={detailsAppointment}
+          open={detailsOpen}
+          onOpenChange={(open) => {
+            setDetailsOpen(open);
+            if (!open) setDetailsAppointment(null);
+          }}
+          salonId={salonId}
+          salonSlug={salonSlug}
+          staff={staff}
+          services={services}
+          workingHours={workingHours as { start: string; end: string }}
+          onSuccess={() => {
+            const weekStartStr = weekStart.toISOString().split('T')[0];
+            const sunday = addDays(weekStart, 6);
+            const weekEndStr = sunday.toISOString().split('T')[0];
+            listAppointments(salonId, {
+              dateFrom: `${weekStartStr}T00:00:00`,
+              dateTo: `${weekEndStr}T23:59:59`,
+            }).then(setWeekAppointments).catch(() => {});
+            router.refresh();
+          }}
+        />
+      )}
     </div>
   );
 }

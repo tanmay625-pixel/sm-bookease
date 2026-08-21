@@ -61,24 +61,29 @@ export function FilterBar({ staff }: FilterBarProps) {
       </div>
 
       {/* Date from */}
-      <Input
-        id="appt-date-from"
-        type="date"
-        defaultValue={sp.get('dateFrom') ?? ''}
-        onChange={(e) => update('dateFrom', e.target.value)}
-        className="w-36 h-8 text-xs"
-        placeholder="From"
-      />
+      <div className="flex flex-col gap-1">
+        <span className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground">From</span>
+        <Input
+          id="appt-date-from"
+          type="date"
+          defaultValue={sp.get('dateFrom') ?? ''}
+          onChange={(e) => update('dateFrom', e.target.value)}
+          className="w-36 h-8 text-xs"
+        />
+      </div>
 
       {/* Date to */}
-      <Input
-        id="appt-date-to"
-        type="date"
-        defaultValue={sp.get('dateTo') ?? ''}
-        onChange={(e) => update('dateTo', e.target.value)}
-        className="w-36 h-8 text-xs"
-        placeholder="To"
-      />
+      <div className="flex flex-col gap-1">
+        <span className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground">To</span>
+        <Input
+          id="appt-date-to"
+          type="date"
+          defaultValue={sp.get('dateTo') ?? ''}
+          onChange={(e) => update('dateTo', e.target.value)}
+          className="w-36 h-8 text-xs"
+        />
+      </div>
+
 
       {/* Status */}
       <Select

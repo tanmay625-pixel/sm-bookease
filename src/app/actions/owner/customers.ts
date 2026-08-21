@@ -34,39 +34,39 @@ export async function upsertCustomer(
   await requireAuth();
   const supabase = createClerkSupabaseClient();
 
-  // Try insert first; if phone already exists for this salon, fetch existing.
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const { data: upsertData } = await (supabase as any)
-    .from('customers')
-    .upsert(
-      {
-        salon_id: salonId,
-        name: input.name,
-        phone: input.phone,
-        email: input.email ?? null,
-      },
-      { onConflict: 'salon_id,phone', ignoreDuplicates: false }
-    )
-    .select()
-    .single() as { data: CustomerRow | null; error: unknown };
-
-  if (upsertData) {
-    revalidatePath('/[slug]/(owner)/clients', 'page');
-    return upsertData;
-  }
-
-  // ignoreDuplicates: false should always return the row; fall back to explicit fetch
-  const { data: existing, error: fetchError } = await supabase
+  // First, check if a customer with this phone already exists for this salon.
+  // If they do, preserve their existing name (ignore what the owner typed).
+  const { data: existing } = await supabase
     .from('customers')
     .select('*')
     .eq('salon_id', salonId)
     .eq('phone', input.phone)
     .single();
 
-  if (fetchError || !existing) {
-    throw new Error('Failed to resolve customer record');
+  if (existing) {
+    // Customer already exists — keep their stored name, only update email if
+    // they don't have one yet and the owner provided one.
+    revalidatePath('/[slug]/(owner)/clients', 'page');
+    return existing as CustomerRow;
+  }
+
+  // New customer — insert with the provided name/email.
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const { data: inserted, error: insertError } = await (supabase as any)
+    .from('customers')
+    .insert({
+      salon_id: salonId,
+      name: input.name,
+      phone: input.phone,
+      email: input.email ?? null,
+    })
+    .select()
+    .single() as { data: CustomerRow | null; error: unknown };
+
+  if (insertError || !inserted) {
+    throw new Error('Failed to create customer record');
   }
 
   revalidatePath('/[slug]/(owner)/clients', 'page');
-  return existing as CustomerRow;
+  return inserted;
 }

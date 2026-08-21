@@ -5,7 +5,7 @@ import {
 import { listStaff } from '@/app/actions/owner/staff';
 import { listServices } from '@/app/actions/owner/services';
 import type { SalonRow, AppointmentStatus } from '@/lib/supabase/types';
-import { TokenStubCard } from '@/components/token-stub-card';
+import { AppointmentCardWithDetails } from '@/components/owner/appointment-card-with-details';
 import { AppointmentStatusActions } from '@/components/owner/appointment-status-actions';
 import { FilterBar } from '@/components/owner/filter-bar';
 import { NewAppointmentTrigger } from '../dashboard/NewAppointmentTrigger';
@@ -101,9 +101,14 @@ export default async function AppointmentsPage({
               {appointments.length} result{appointments.length !== 1 ? 's' : ''}
             </p>
             {appointments.map((a) => (
-              <TokenStubCard
+              <AppointmentCardWithDetails
                 key={a.id}
                 appointment={a}
+                salonId={salon?.id}
+                salonSlug={slug}
+                staff={staff}
+                services={services}
+                workingHours={salon?.working_hours as { start: string; end: string } | undefined}
                 actions={
                   salon && a.status !== 'cancelled' ? (
                     <AppointmentStatusActions

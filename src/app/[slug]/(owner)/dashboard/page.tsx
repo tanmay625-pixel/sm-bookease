@@ -3,7 +3,7 @@ import { listAppointments } from '@/app/actions/owner/appointments';
 import { listStaff } from '@/app/actions/owner/staff';
 import { listServices } from '@/app/actions/owner/services';
 import type { SalonRow } from '@/lib/supabase/types';
-import { TokenStubCard } from '@/components/token-stub-card';
+import { AppointmentCardWithDetails } from '@/components/owner/appointment-card-with-details';
 import { AppointmentStatusActions } from '@/components/owner/appointment-status-actions';
 import { NewAppointmentTrigger } from './NewAppointmentTrigger';
 import { CalendarDays, Clock, Users, XCircle } from 'lucide-react';
@@ -112,9 +112,14 @@ export default async function DashboardPage({
         ) : (
           <div className="flex flex-col gap-3">
             {todayAppts.map((a) => (
-              <TokenStubCard
+              <AppointmentCardWithDetails
                 key={a.id}
                 appointment={a}
+                salonId={salon?.id}
+                salonSlug={slug}
+                staff={staff}
+                services={services}
+                workingHours={salon?.working_hours as { start: string; end: string } | undefined}
                 actions={
                   salon && a.status !== 'cancelled' ? (
                     <AppointmentStatusActions

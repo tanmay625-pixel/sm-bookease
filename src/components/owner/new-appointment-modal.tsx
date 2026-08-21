@@ -29,7 +29,7 @@ import { checkSlotAvailability } from '@/app/actions/customer/booking';
 import type { StaffRow, ServiceRow } from '@/lib/supabase/types';
 import type { AppointmentWithRelations } from '@/components/token-stub-card';
 import { CalendarDays, Clock, Plus, Pencil, Loader2, AlertCircle, CheckCircle2 } from 'lucide-react';
-import { todayIST, toIST, currentTimeIST } from '@/lib/timezone';
+import { todayIST, toIST, currentTimeIST, IST_OFFSET_MINUTES } from '@/lib/timezone';
 import { ScrollTimePicker } from '@/components/scroll-time-picker';
 import {
   Combobox,
@@ -111,20 +111,22 @@ export function NewAppointmentModal({
         setClientEmail(appointment.customers?.email ?? '');
         const initIds = appointment.appointment_services?.length
           ? appointment.appointment_services
-              .map((as) => as.services?.id)
-              .filter((id): id is string => Boolean(id))
+            .map((as) => as.services?.id)
+            .filter((id): id is string => Boolean(id))
           : [appointment.service_id];
         setSelectedServiceIds(initIds);
         setStaffId(appointment.staff_id ?? 'any');
-        
+
         const apptDate = appointment.slot_start ? new Date(appointment.slot_start) : new Date();
-        const yyyyMmDd = appointment.slot_start ? appointment.slot_start.split('T')[0] : todayIST();
+        // Extract IST date/time (not UTC or local)
+        const istDate = new Date(apptDate.getTime() + IST_OFFSET_MINUTES * 60 * 1000);
+        const yyyyMmDd = `${istDate.getUTCFullYear()}-${String(istDate.getUTCMonth() + 1).padStart(2, '0')}-${String(istDate.getUTCDate()).padStart(2, '0')}`;
         setDate(yyyyMmDd);
-        
-        const h = apptDate.getHours();
-        const m = apptDate.getMinutes();
+
+        const h = istDate.getUTCHours();
+        const m = istDate.getUTCMinutes();
         setSelectedTime(`${h.toString().padStart(2, '0')}:${m.toString().padStart(2, '0')}`);
-        
+
         setNotes(appointment.notes ?? '');
       } else {
         setClientName('');
@@ -323,7 +325,11 @@ export function NewAppointmentModal({
                     id="nm-client-phone"
                     value={clientPhone}
                     onChange={(e) => setClientPhone(e.target.value)}
-                    placeholder="91XXXXXXXXXX"
+                    type='tel'
+                    placeholder="9272576683"
+                    inputMode='numeric'
+                    pattern="[0-9]*"
+                    maxLength={10}
                     disabled={isEdit}
                     required={!isEdit}
                     className={isEdit ? 'bg-muted/50 text-muted-foreground cursor-not-allowed' : ''}
@@ -446,6 +452,7 @@ export function NewAppointmentModal({
               ) : (
                 <>
                   <ScrollTimePicker
+                    key={`${appointment?.id ?? 'new'}-${open}`}
                     value={selectedTime}
                     onChange={setSelectedTime}
                     minTime={workingHours.start}
@@ -512,8 +519,8 @@ export function NewAppointmentModal({
                     ? 'Saving…'
                     : 'Creating…'
                   : isEdit
-                  ? 'Save Changes'
-                  : 'Create Appointment'}
+                    ? 'Save Changes'
+                    : 'Create Appointment'}
               </Button>
             </DialogFooter>
           </form>
