@@ -44,7 +44,7 @@ export default async function OwnerLayout({
   }
 
   return (
-    <div className="flex h-full min-h-screen">
+    <div className="flex h-screen overflow-hidden">
       {/* ── Sidebar (desktop) ─────────────────────────────── */}
       <aside className="hidden md:flex w-56 shrink-0 flex-col border-r border-border bg-sidebar">
         {/* Logo / salon name */}

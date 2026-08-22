@@ -1,7 +1,7 @@
 'use client';
 
 import { useRouter, useSearchParams, usePathname } from 'next/navigation';
-import { useCallback } from 'react';
+import { useCallback, useState } from 'react';
 import { Input } from '@/components/ui/input';
 import {
   Select,
@@ -46,6 +46,14 @@ export function FilterBar({ staff }: FilterBarProps) {
 
   const hasFilters = sp.toString().length > 0;
 
+  // Date inputs: show as text+placeholder when empty, switch to date on focus
+  const [fromType, setFromType] = useState<'text' | 'date'>(
+    sp.get('dateFrom') ? 'date' : 'text'
+  );
+  const [toType, setToType] = useState<'text' | 'date'>(
+    sp.get('dateTo') ? 'date' : 'text'
+  );
+
   return (
     <div className="flex flex-wrap items-center gap-2">
       {/* Search */}
@@ -60,30 +68,35 @@ export function FilterBar({ staff }: FilterBarProps) {
         />
       </div>
 
-      {/* Date from */}
-      <div className="flex flex-col gap-1">
-        <span className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground">From</span>
-        <Input
-          id="appt-date-from"
-          type="date"
-          defaultValue={sp.get('dateFrom') ?? ''}
-          onChange={(e) => update('dateFrom', e.target.value)}
-          className="w-36 h-8 text-xs"
-        />
-      </div>
+      {/* Date from — shows "From" placeholder when empty */}
+      <Input
+        id="appt-date-from"
+        type={fromType}
+        defaultValue={sp.get('dateFrom') ?? ''}
+        onChange={(e) => {
+          update('dateFrom', e.target.value);
+          if (!e.target.value) setFromType('text');
+        }}
+        className="w-36 h-8 text-xs"
+        placeholder="From"
+        onFocus={() => setFromType('date')}
+        onBlur={(e) => { if (!e.currentTarget.value) setFromType('text'); }}
+      />
 
-      {/* Date to */}
-      <div className="flex flex-col gap-1">
-        <span className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground">To</span>
-        <Input
-          id="appt-date-to"
-          type="date"
-          defaultValue={sp.get('dateTo') ?? ''}
-          onChange={(e) => update('dateTo', e.target.value)}
-          className="w-36 h-8 text-xs"
-        />
-      </div>
-
+      {/* Date to — shows "To" placeholder when empty */}
+      <Input
+        id="appt-date-to"
+        type={toType}
+        defaultValue={sp.get('dateTo') ?? ''}
+        onChange={(e) => {
+          update('dateTo', e.target.value);
+          if (!e.target.value) setToType('text');
+        }}
+        className="w-36 h-8 text-xs"
+        placeholder="To"
+        onFocus={() => setToType('date')}
+        onBlur={(e) => { if (!e.currentTarget.value) setToType('text'); }}
+      />
 
       {/* Status */}
       <Select

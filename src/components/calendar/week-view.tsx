@@ -406,9 +406,9 @@ export function WeekView({
   const today = new Date();
 
   return (
-    <div className="flex flex-col gap-4">
-      {/* ===== Toolbar ===== */}
-      <div className="flex flex-wrap items-center gap-2">
+    <div className="flex flex-col gap-4 min-h-0">
+      {/* ===== Toolbar (sticky) ===== */}
+      <div className="sticky top-0 z-20 bg-background pt-1 pb-2 flex flex-wrap items-center gap-2">
         {/* Week nav */}
         <div className="flex items-center gap-1">
           <Button variant="outline" size="icon" onClick={goToPrevWeek}>
@@ -482,8 +482,8 @@ export function WeekView({
           </div>
         )}
         <div className="min-w-[800px]">
-          {/* Header row */}
-          <div className="flex border-b border-border bg-muted/40">
+          {/* Header row (sticky) */}
+          <div className="sticky top-0 z-10 flex border-b border-border bg-muted/40">
             {/* Gutter spacer */}
             <div className="w-14 shrink-0" />
 

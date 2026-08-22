@@ -46,12 +46,15 @@ export function AppointmentStatusActions({
 
   return (
     <>
-      <div className="flex flex-wrap items-center gap-1.5">
+      <div
+        className="flex flex-wrap items-center gap-1.5"
+        onClick={(e) => e.stopPropagation()} // prevent bubbling to card click
+      >
         {appointment.status === 'pending' && (
           <Button
             size="sm"
             variant="default"
-            onClick={handleConfirm}
+            onClick={(e) => { e.stopPropagation(); handleConfirm(); }}
             disabled={isPending}
             className="h-7 gap-1 text-xs"
           >
@@ -64,7 +67,7 @@ export function AppointmentStatusActions({
           <Button
             size="sm"
             variant="outline"
-            onClick={() => setEditOpen(true)}
+            onClick={(e) => { e.stopPropagation(); setEditOpen(true); }}
             disabled={isPending}
             className="h-7 gap-1 text-xs"
           >
@@ -73,16 +76,18 @@ export function AppointmentStatusActions({
           </Button>
         )}
 
-        <Button
-          size="sm"
-          variant="ghost"
-          onClick={handleCancel}
-          disabled={isPending}
-          className="h-7 gap-1 text-xs text-destructive hover:bg-destructive/10 hover:text-destructive"
-        >
-          <XCircle className="size-3" />
-          Cancel
-        </Button>
+        {!isPast && (
+          <Button
+            size="sm"
+            variant="ghost"
+            onClick={(e) => { e.stopPropagation(); handleCancel(); }}
+            disabled={isPending}
+            className="h-7 gap-1 text-xs text-destructive hover:bg-destructive/10 hover:text-destructive"
+          >
+            <XCircle className="size-3" />
+            Cancel
+          </Button>
+        )}
       </div>
 
       <NewAppointmentModal

@@ -67,25 +67,27 @@ export default async function AppointmentsPage({
     : [[], [], []];
 
   return (
-    <div className="p-4 md:p-6 flex flex-col gap-5">
-      {/* Header */}
-      <div className="flex items-center justify-between gap-4">
-        <h1 className="text-xl font-semibold tracking-tight">Appointments</h1>
-        {salon && (
-          <NewAppointmentTrigger
-            salonId={salon.id}
-            salonSlug={slug}
-            staff={staff}
-            services={services}
-            workingHours={salon.working_hours as { start: string; end: string }}
-          />
-        )}
-      </div>
+    <div className="p-4 md:p-6 flex flex-col gap-4">
+      {/* Sticky Header + Filters */}
+      <div className="sticky top-0 z-20 bg-background pb-3 flex flex-col gap-3">
+        <div className="flex items-center justify-between gap-4">
+          <h1 className="text-xl font-semibold tracking-tight">Appointments</h1>
+          {salon && (
+            <NewAppointmentTrigger
+              salonId={salon.id}
+              salonSlug={slug}
+              staff={staff}
+              services={services}
+              workingHours={salon.working_hours as { start: string; end: string }}
+            />
+          )}
+        </div>
 
-      {/* Filter bar */}
-      <Suspense>
-        <FilterBar staff={staff} />
-      </Suspense>
+        {/* Filter bar */}
+        <Suspense>
+          <FilterBar staff={staff} />
+        </Suspense>
+      </div>
 
       {/* Results */}
       <Suspense fallback={<AppointmentsSkeleton />}>

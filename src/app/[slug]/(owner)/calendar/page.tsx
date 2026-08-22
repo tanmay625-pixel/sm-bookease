@@ -55,8 +55,9 @@ export default async function CalendarPage({
   ]);
 
   return (
-    <div className="p-4 md:p-6 flex flex-col gap-5 h-full">
-      <div>
+    <div className="p-4 md:p-6 flex flex-col gap-5 h-full min-h-0">
+      {/* Sticky page header */}
+      <div className="sticky top-0 z-20 bg-background pb-2">
         <h1 className="text-xl font-semibold tracking-tight">Calendar</h1>
       </div>
       <WeekView

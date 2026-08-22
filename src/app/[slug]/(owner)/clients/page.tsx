@@ -39,20 +39,22 @@ export default async function ClientsPage({
   const clients = salon ? await listClients(salon.id, search) : [];
 
   return (
-    <div className="p-4 md:p-6 flex flex-col gap-5">
-      {/* Header */}
-      <div>
-        <h1 className="text-xl font-semibold tracking-tight">Clients</h1>
-        <p className="text-xs text-muted-foreground mt-0.5">
-          {clients.length} client{clients.length !== 1 ? 's' : ''}
-          {search ? ` matching "${search}"` : ''}
-        </p>
-      </div>
+    <div className="p-4 md:p-6 flex flex-col gap-4">
+      {/* Sticky Header + Search */}
+      <div className="sticky top-0 z-20 bg-background pb-3 flex flex-col gap-3">
+        <div>
+          <h1 className="text-xl font-semibold tracking-tight">Clients</h1>
+          <p className="text-xs text-muted-foreground mt-0.5">
+            {clients.length} client{clients.length !== 1 ? 's' : ''}
+            {search ? ` matching "${search}"` : ''}
+          </p>
+        </div>
 
-      {/* Search */}
-      <Suspense>
-        <ClientsSearch defaultValue={search} />
-      </Suspense>
+        {/* Search */}
+        <Suspense>
+          <ClientsSearch defaultValue={search} />
+        </Suspense>
+      </div>
 
       {/* List */}
       <Suspense fallback={<ClientsSkeleton />}>
