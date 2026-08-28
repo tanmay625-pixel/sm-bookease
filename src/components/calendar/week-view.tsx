@@ -27,6 +27,7 @@ interface WeekViewProps {
   workingHours: WorkingHours;
   workingDays: string[];
   initialWeekStart: string;
+  timeFormat?: '12h' | '24h';
 }
 
 // ---------------------------------------------------------------------------
@@ -203,6 +204,7 @@ export function WeekView({
   workingHours,
   workingDays,
   initialWeekStart,
+  timeFormat = '12h',
 }: WeekViewProps) {
   const router = useRouter();
 
@@ -688,6 +690,7 @@ export function WeekView({
         staff={staff}
         services={services}
         workingHours={workingHours as { start: string; end: string }}
+        timeFormat={timeFormat}
         appointment={modalAppointment}
         initialDate={modalInitialDate}
         initialTime={modalInitialTime}
@@ -717,6 +720,7 @@ export function WeekView({
           staff={staff}
           services={services}
           workingHours={workingHours as { start: string; end: string }}
+          timeFormat={timeFormat}
           onSuccess={() => {
             const weekStartStr = weekStart.toISOString().split('T')[0];
             const sunday = addDays(weekStart, 6);

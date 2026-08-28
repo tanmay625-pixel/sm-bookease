@@ -76,6 +76,7 @@ export default async function SettingsPage({
             defaultName={salon.name}
             defaultWorkingHours={wh}
             defaultWorkingDays={salon.working_days}
+            defaultTimeFormat={salon.time_format || '12h'}
           />
         </TabsContent>
 

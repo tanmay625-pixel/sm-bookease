@@ -27,6 +27,7 @@ export type Database = {
           slug: string;
           working_hours: WorkingHours;
           working_days: string[];
+          time_format: '12h' | '24h';
           created_at: string;
         };
         Insert: Omit<

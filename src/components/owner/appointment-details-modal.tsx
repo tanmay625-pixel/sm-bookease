@@ -27,6 +27,7 @@ interface AppointmentDetailsModalProps {
   services?: ServiceRow[];
   workingHours?: { start: string; end: string };
   onSuccess?: () => void;
+  timeFormat?: '12h' | '24h';
 }
 
 const STATUS_STYLES: Record<string, { label: string; dot: string; badge: 'default' | 'secondary' | 'destructive' | 'outline' }> = {
@@ -45,6 +46,7 @@ export function AppointmentDetailsModal({
   services,
   workingHours,
   onSuccess,
+  timeFormat = '12h',
 }: AppointmentDetailsModalProps) {
   const [editOpen, setEditOpen] = useState(false);
 
@@ -191,7 +193,11 @@ export function AppointmentDetailsModal({
           services={services}
           workingHours={workingHours}
           appointment={appointment}
-          onSuccess={onSuccess}
+          onSuccess={() => {
+            onSuccess?.();
+            onOpenChange(false);
+          }}
+          timeFormat={timeFormat}
         />
       )}
     </>

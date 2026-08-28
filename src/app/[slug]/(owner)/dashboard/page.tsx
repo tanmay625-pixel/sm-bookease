@@ -19,7 +19,7 @@ export default async function DashboardPage({
 
   const { data: salonData } = await supabase
     .from('salons')
-    .select('id, name, working_hours')
+    .select('id, name, working_hours, time_format')
     .eq('slug', slug)
     .single();
   const salon = salonData as SalonRow | null;
@@ -72,6 +72,7 @@ export default async function DashboardPage({
             staff={staff}
             services={services}
             workingHours={salon.working_hours as { start: string; end: string }}
+            timeFormat={salon.time_format || '12h'}
           />
         )}
       </div>
@@ -120,6 +121,7 @@ export default async function DashboardPage({
                 staff={staff}
                 services={services}
                 workingHours={salon?.working_hours as { start: string; end: string } | undefined}
+                timeFormat={salon?.time_format || '12h'}
                 actions={
                   salon && a.status !== 'cancelled' ? (
                     <AppointmentStatusActions
@@ -129,6 +131,7 @@ export default async function DashboardPage({
                       staff={staff}
                       services={services}
                       workingHours={salon.working_hours as { start: string; end: string }}
+                      timeFormat={salon.time_format || '12h'}
                     />
                   ) : undefined
                 }

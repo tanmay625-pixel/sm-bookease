@@ -30,7 +30,7 @@ import type { StaffRow, ServiceRow } from '@/lib/supabase/types';
 import type { AppointmentWithRelations } from '@/components/token-stub-card';
 import { CalendarDays, Clock, Plus, Pencil, Loader2, AlertCircle, CheckCircle2 } from 'lucide-react';
 import { todayIST, toIST, currentTimeIST, IST_OFFSET_MINUTES } from '@/lib/timezone';
-import { ScrollTimePicker } from '@/components/scroll-time-picker';
+import { SmartTimeInput } from '@/components/smart-time-input';
 import {
   Combobox,
   ComboboxChips,
@@ -59,7 +59,10 @@ interface NewAppointmentModalProps {
   /** Optional prefilled date for new appointments (YYYY-MM-DD) */
   initialDate?: string;
   /** Optional prefilled time for new appointments (HH:MM) */
+  /** Optional prefilled time for new appointments (HH:MM) */
   initialTime?: string;
+  /** Salon time format (12h or 24h) */
+  timeFormat?: '12h' | '24h';
 }
 
 export function NewAppointmentModal({
@@ -74,6 +77,7 @@ export function NewAppointmentModal({
   onSuccess,
   initialDate,
   initialTime,
+  timeFormat = '12h',
 }: NewAppointmentModalProps) {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
@@ -451,13 +455,13 @@ export function NewAppointmentModal({
                 <p className="text-xs text-muted-foreground">Choose a service first</p>
               ) : (
                 <>
-                  <ScrollTimePicker
-                    key={`${appointment?.id ?? 'new'}-${open}`}
+                  <SmartTimeInput
                     value={selectedTime}
                     onChange={setSelectedTime}
                     minTime={workingHours.start}
                     maxTime={workingHours.end}
-                    minuteStep={5}
+                    stepMinutes={30}
+                    format={timeFormat}
                   />
 
                   {/* Inline Availability Status */}

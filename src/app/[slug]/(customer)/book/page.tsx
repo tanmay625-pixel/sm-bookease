@@ -35,7 +35,7 @@ export default async function BookPage({
 
   const { data: salonData } = await supabase
     .from('salons')
-    .select('id, name, working_hours')
+    .select('id, name, working_hours, time_format')
     .eq('slug', slug)
     .single();
   const salon = salonData as SalonRow | null;
@@ -69,6 +69,7 @@ export default async function BookPage({
         isSignedIn={isSignedIn}
         initialParams={initialParams}
         workingHours={salon.working_hours as { start: string; end: string }}
+        timeFormat={salon.time_format || '12h'}
       />
     </div>
   );

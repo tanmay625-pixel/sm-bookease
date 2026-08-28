@@ -1,12 +1,13 @@
-'use client';
+﻿'use client';
 
 import { useState, useTransition } from 'react';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Button } from '@/components/ui/button';
 import { ModeToggle } from '@/components/ui/theme-toggle';
-import { ScrollTimePicker } from '@/components/scroll-time-picker';
+import { SmartTimeInput } from '@/components/smart-time-input';
 import { updateSalonSettings } from '@/app/actions/owner/salon';
+import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 
 const DAYS = [
   { key: 'mon', label: 'Mon' },
@@ -23,6 +24,7 @@ interface BusinessProfileFormProps {
   defaultName: string;
   defaultWorkingHours: { start: string; end: string };
   defaultWorkingDays: string[];
+  defaultTimeFormat: '12h' | '24h';
 }
 
 export function BusinessProfileForm({
@@ -30,9 +32,11 @@ export function BusinessProfileForm({
   defaultName,
   defaultWorkingHours,
   defaultWorkingDays,
+  defaultTimeFormat,
 }: BusinessProfileFormProps) {
   const [start, setStart] = useState(defaultWorkingHours.start || '09:00');
   const [end, setEnd] = useState(defaultWorkingHours.end || '17:00');
+  const [timeFormat, setTimeFormat] = useState<'12h' | '24h'>(defaultTimeFormat);
   const [isPending, startTransition] = useTransition();
 
   async function handleSubmit(formData: FormData) {
@@ -46,6 +50,7 @@ export function BusinessProfileForm({
         name,
         workingHours: { start, end },
         workingDays: selectedDays,
+        timeFormat,
       });
     });
   }
@@ -62,25 +67,45 @@ export function BusinessProfileForm({
         />
       </div>
 
+      <div className="flex flex-col gap-2">
+        <Label className="text-xs">Time format</Label>
+        <RadioGroup
+          value={timeFormat}
+          onValueChange={(val: '12h' | '24h') => setTimeFormat(val)}
+          className="flex items-center gap-4"
+        >
+          <div className="flex items-center space-x-2">
+            <RadioGroupItem value="12h" id="r1" />
+            <Label htmlFor="r1" className="cursor-pointer font-normal text-sm">12-hour (1:00 PM)</Label>
+          </div>
+          <div className="flex items-center space-x-2">
+            <RadioGroupItem value="24h" id="r2" />
+            <Label htmlFor="r2" className="cursor-pointer font-normal text-sm">24-hour (13:00)</Label>
+          </div>
+        </RadioGroup>
+      </div>
+
       <div className="grid grid-cols-2 gap-4">
         <div className="flex flex-col gap-2">
           <Label className="text-xs">Opens at</Label>
-          <ScrollTimePicker
+          <SmartTimeInput
             value={start}
             onChange={setStart}
-            minuteStep={5}
+            stepMinutes={30}
             minTime="00:00"
             maxTime="23:55"
+            format={timeFormat}
           />
         </div>
         <div className="flex flex-col gap-2">
           <Label className="text-xs">Closes at</Label>
-          <ScrollTimePicker
+          <SmartTimeInput
             value={end}
             onChange={setEnd}
-            minuteStep={5}
+            stepMinutes={30}
             minTime="00:00"
             maxTime="23:55"
+            format={timeFormat}
           />
         </div>
       </div>

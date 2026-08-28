@@ -15,6 +15,7 @@ interface AppointmentStatusActionsProps {
   staff: StaffRow[];
   services: ServiceRow[];
   workingHours: { start: string; end: string };
+  timeFormat?: '12h' | '24h';
 }
 
 export function AppointmentStatusActions({
@@ -24,6 +25,7 @@ export function AppointmentStatusActions({
   staff,
   services,
   workingHours,
+  timeFormat = '12h',
 }: AppointmentStatusActionsProps) {
   const [isPending, startTransition] = useTransition();
   const [editOpen, setEditOpen] = useState(false);
@@ -99,6 +101,7 @@ export function AppointmentStatusActions({
         services={services}
         workingHours={workingHours}
         appointment={appointment}
+        timeFormat={timeFormat}
       />
     </>
   );

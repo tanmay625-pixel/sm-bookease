@@ -1,32 +1,15 @@
-import { clerkMiddleware, createRouteMatcher } from "@clerk/nextjs/server";
+import { clerkMiddleware } from "@clerk/nextjs/server";
 
 /**
- * Public routes — not Clerk-protected:
- * - /sign-in, /sign-up      — Clerk auth pages (existing)
- * - /:slug/sign-in          — Customer phone+OTP auth
- * - /:slug/book             — Customer booking flow
- * - /:slug/history          — Customer appointment history
- * - /api/webhooks/whatsapp  — Meta webhook handshake + events
- *
- * Owner-facing /:slug/(owner)/* routes are Clerk-protected by default.
- * The "does this user own this slug" check is done inside
- * src/app/[slug]/(owner)/layout.tsx using await auth() — NOT here.
- * See: https://nextjs.org/docs/messages/middleware-upgrade-guide (CVE-2025-29927)
+ * Clerk middleware now only manages authentication session cookies on incoming requests.
+ * All route protection and authorization checks are handled at the resource level:
+ * - Owner pages & layouts: src/app/[slug]/(owner)/layout.tsx (await auth() + ownership check)
+ * - Landing & Onboarding: src/app/page.tsx & src/app/onboarding/page.tsx (await auth())
+ * - Server Actions: src/app/actions/owner/*.ts (requireAuth() + Supabase RLS)
+ * - Customer routes: OTP session cookies
+ * - Webhooks: Signature verification
  */
-const isPublicRoute = createRouteMatcher([
-  "/sign-in(.*)",
-  "/sign-up(.*)",
-  "/:slug/sign-in(.*)",
-  "/:slug/book(.*)",
-  "/:slug/history(.*)",
-  "/api/webhooks/whatsapp(.*)",
-]);
-
-export default clerkMiddleware(async (auth, request) => {
-  if (!isPublicRoute(request)) {
-    await auth.protect();
-  }
-});
+export default clerkMiddleware();
 
 export const config = {
   matcher: [

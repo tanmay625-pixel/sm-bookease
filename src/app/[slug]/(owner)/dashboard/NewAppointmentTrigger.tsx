@@ -12,6 +12,7 @@ interface NewAppointmentTriggerProps {
   staff: StaffRow[];
   services: ServiceRow[];
   workingHours: { start: string; end: string };
+  timeFormat?: '12h' | '24h';
 }
 
 export function NewAppointmentTrigger({
@@ -20,6 +21,7 @@ export function NewAppointmentTrigger({
   staff,
   services,
   workingHours,
+  timeFormat = '12h',
 }: NewAppointmentTriggerProps) {
   const [open, setOpen] = useState(false);
 
@@ -41,6 +43,7 @@ export function NewAppointmentTrigger({
         staff={staff}
         services={services}
         workingHours={workingHours}
+        timeFormat={timeFormat}
       />
     </>
   );

@@ -19,6 +19,7 @@ interface AppointmentCardWithDetailsProps {
   services?: ServiceRow[];
   workingHours?: { start: string; end: string };
   onSuccess?: () => void;
+  timeFormat?: '12h' | '24h';
 }
 
 /**
@@ -38,6 +39,7 @@ export function AppointmentCardWithDetails({
   services,
   workingHours,
   onSuccess,
+  timeFormat = '12h',
 }: AppointmentCardWithDetailsProps) {
   const [detailsOpen, setDetailsOpen] = useState(false);
 
@@ -73,6 +75,7 @@ export function AppointmentCardWithDetails({
         services={services}
         workingHours={workingHours}
         onSuccess={onSuccess}
+        timeFormat={timeFormat}
       />
     </>
   );

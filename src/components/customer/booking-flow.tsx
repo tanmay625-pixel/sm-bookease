@@ -19,7 +19,7 @@ import {
 } from 'lucide-react';
 import Link from 'next/link';
 import { cn } from '@/lib/utils';
-import { ScrollTimePicker } from '@/components/scroll-time-picker';
+import { SmartTimeInput } from '@/components/smart-time-input';
 
 interface BookingFlowProps {
   slug: string;
@@ -35,6 +35,7 @@ interface BookingFlowProps {
     slotEnd?: string;
     time?: string;
   };
+  timeFormat?: '12h' | '24h';
 }
 
 type Step = 1 | 2 | 3 | 4;
@@ -53,6 +54,7 @@ export function BookingFlow({
   isSignedIn,
   workingHours,
   initialParams,
+  timeFormat = '12h',
 }: BookingFlowProps) {
   const today = todayIST();
 
@@ -448,13 +450,13 @@ export function BookingFlow({
           </div>
 
           <div className="mb-6">
-            <ScrollTimePicker
-              label="Select time"
+            <SmartTimeInput
               value={selectedTime}
               onChange={setSelectedTime}
               minTime={workingHours.start}
               maxTime={workingHours.end}
-              minuteStep={5}
+              stepMinutes={30}
+              format={timeFormat}
             />
           </div>
 

@@ -66,9 +66,10 @@ export default async function CalendarPage({
         services={services}
         salonId={salon.id}
         salonSlug={slug}
-        workingHours={salon.working_hours}
+        workingHours={salon.working_hours as { start: string; end: string }}
         workingDays={salon.working_days}
         initialWeekStart={weekStartStr}
+        timeFormat={salon.time_format || '12h'}
       />
     </div>
   );

@@ -42,6 +42,7 @@ type SalonSettings = {
   name?: string;
   workingHours?: { start: string; end: string };
   workingDays?: string[];
+  timeFormat?: '12h' | '24h';
 };
 
 export async function updateSalonSettings(
@@ -57,6 +58,7 @@ export async function updateSalonSettings(
   if (settings.name !== undefined) update.name = settings.name;
   if (settings.workingHours !== undefined) update.working_hours = settings.workingHours;
   if (settings.workingDays !== undefined) update.working_days = settings.workingDays;
+  if (settings.timeFormat !== undefined) update.time_format = settings.timeFormat;
 
   // RLS ensures only the owner of this salon can update it
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
