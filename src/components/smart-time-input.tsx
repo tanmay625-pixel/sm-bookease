@@ -178,7 +178,7 @@ export interface SmartTimeInputProps {
 export function SmartTimeInput({
   value = '',
   onChange,
-  stepMinutes = 30,
+  stepMinutes = 5,
   format = '12h',
   placeholder = 'Select or type time...',
   className,

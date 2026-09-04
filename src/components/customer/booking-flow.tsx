@@ -436,7 +436,7 @@ export function BookingFlow({
               onChange={setSelectedTime}
               minTime={workingHours.start}
               maxTime={workingHours.end}
-              stepMinutes={30}
+              stepMinutes={5}
               format={timeFormat}
             />
           </div>
