@@ -20,6 +20,7 @@ import {
 import Link from 'next/link';
 import { cn } from '@/lib/utils';
 import { SmartTimeInput } from '@/components/smart-time-input';
+import { ServiceCombobox } from '@/components/service-combobox';
 
 interface BookingFlowProps {
   slug: string;
@@ -282,9 +283,9 @@ export function BookingFlow({
       {/* ── Step 1: Select Service ──────────────────────────────── */}
       {step === 1 && (
         <div className="flex-1 p-4 max-w-md mx-auto w-full">
-          <h2 className="text-sm font-semibold mb-1">Select a service</h2>
+          <h2 className="text-sm font-semibold mb-1">Select services</h2>
           <p className="text-xs text-muted-foreground mb-4">
-            Choose what you&apos;d like to book today.
+            Search or select what you&apos;d like to book today.
           </p>
 
           {services.length === 0 ? (
@@ -292,52 +293,32 @@ export function BookingFlow({
               No services available at this salon currently.
             </div>
           ) : (
-            <div className="flex flex-col gap-2.5">
-              {services.map((svc) => {
-                const isSelected = selectedServices.some(s => s.id === svc.id);
-                return (
-                  <button
-                    key={svc.id}
-                    type="button"
-                    onClick={() => {
-                      setSelectedServices(prev => 
-                        prev.some(s => s.id === svc.id)
-                          ? prev.filter(s => s.id !== svc.id)
-                          : [...prev, svc]
-                      )
-                    }}
-                    className={cn(
-                      'flex items-center justify-between rounded-xl border p-4 text-left transition-all',
-                      'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
-                      isSelected
-                        ? 'border-primary bg-primary/5 shadow-xs'
-                        : 'border-border bg-card hover:border-border/80 hover:bg-accent/40'
-                    )}
-                  >
-                    <div className="flex flex-col gap-1">
-                      <span className="font-medium text-sm text-foreground">{svc.name}</span>
-                      <span className="text-xs text-muted-foreground flex items-center gap-1">
-                        <Clock className="size-3" />
-                        {svc.duration_minutes} mins
-                      </span>
-                    </div>
-                    <div className="flex items-center gap-3">
-                      <span className="font-semibold text-sm text-foreground">₹{svc.price}</span>
-                      {isSelected && (
-                        <CheckCircle2 className="size-4 text-primary shrink-0" />
-                      )}
-                    </div>
-                  </button>
-                );
-              })}
+            <div className="flex flex-col gap-3">
+              <ServiceCombobox
+                services={services}
+                selectedServiceIds={selectedServices.map((s) => s.id)}
+                onSelectionChange={(newIds) => {
+                  setSelectedServices(services.filter((s) => newIds.includes(s.id)));
+                }}
+                placeholder="Search or select services…"
+              />
             </div>
           )}
 
           <div className="mt-6 flex flex-col gap-3">
             {selectedServices.length > 0 && (
               <div className="flex items-center justify-between text-sm px-1">
-                <span className="text-muted-foreground">{selectedServices.length} service{selectedServices.length > 1 ? 's' : ''} selected</span>
-                <span className="font-semibold">₹{selectedServices.reduce((acc, s) => acc + Number(s.price), 0)}</span>
+                <span className="text-muted-foreground">
+                  {selectedServices.length} service{selectedServices.length > 1 ? 's' : ''} selected
+                </span>
+                <div className="flex items-center gap-2">
+                  <span className="text-xs text-muted-foreground">
+                    {totalDuration} mins
+                  </span>
+                  <span className="font-semibold">
+                    ₹{selectedServices.reduce((acc, s) => acc + Number(s.price), 0)}
+                  </span>
+                </div>
               </div>
             )}
             <Button

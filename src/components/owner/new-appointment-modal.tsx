@@ -31,18 +31,7 @@ import type { AppointmentWithRelations } from '@/components/token-stub-card';
 import { CalendarDays, Clock, Plus, Pencil, Loader2, AlertCircle, CheckCircle2 } from 'lucide-react';
 import { todayIST, toIST, currentTimeIST, IST_OFFSET_MINUTES } from '@/lib/timezone';
 import { SmartTimeInput } from '@/components/smart-time-input';
-import {
-  Combobox,
-  ComboboxChips,
-  ComboboxChip,
-  ComboboxChipsInput,
-  ComboboxContent,
-  ComboboxList,
-  ComboboxItem,
-  ComboboxEmpty,
-  ComboboxValue,
-  useComboboxAnchor,
-} from '@/components/ui/combobox';
+import { ServiceCombobox } from '@/components/service-combobox';
 
 interface NewAppointmentModalProps {
   open: boolean;
@@ -104,7 +93,6 @@ export function NewAppointmentModal({
   // Availability state
   const [availability, setAvailability] = useState<{ available: boolean; conflictReason?: string } | null>(null);
   const [checkingAvailability, setCheckingAvailability] = useState(false);
-  const anchorRef = useComboboxAnchor();
 
   // Initialize or reset form state on open / appointment change
   useEffect(() => {
@@ -368,47 +356,13 @@ export function NewAppointmentModal({
                   </span>
                 )}
               </div>
-              <Combobox
-                multiple
-                value={selectedServiceIds}
-                onValueChange={(newValue) => setSelectedServiceIds(newValue)}
-                itemToStringLabel={(id) => services.find(s => s.id === id)?.name ?? ''}
-                items={services.map((s) => s.id)}
-              >
-                <ComboboxChips ref={anchorRef}>
-                  <ComboboxValue>
-                    {(values: string[]) => (
-                      <>
-                        {values.map((id) => {
-                          const svc = services.find(s => s.id === id);
-                          return svc ? (
-                            <ComboboxChip key={id}>
-                              {svc.name}
-                            </ComboboxChip>
-                          ) : null;
-                        })}
-                        <ComboboxChipsInput placeholder={values.length > 0 ? '' : 'Search services…'} />
-                      </>
-                    )}
-                  </ComboboxValue>
-                </ComboboxChips>
-                <ComboboxContent anchor={anchorRef} container={comboboxContainer}>
-                  <ComboboxList>
-                    {(id: string) => {
-                      const svc = services.find((s) => s.id === id);
-                      return svc ? (
-                        <ComboboxItem key={id} value={id}>
-                          <span className="flex-1">{svc.name}</span>
-                          <span className="tabular-nums text-muted-foreground ml-auto mr-5">
-                            {svc.duration_minutes}m · ₹{svc.price}
-                          </span>
-                        </ComboboxItem>
-                      ) : null;
-                    }}
-                  </ComboboxList>
-                  <ComboboxEmpty>No services found</ComboboxEmpty>
-                </ComboboxContent>
-              </Combobox>
+              <ServiceCombobox
+                services={services}
+                selectedServiceIds={selectedServiceIds}
+                onSelectionChange={setSelectedServiceIds}
+                container={comboboxContainer}
+                placeholder={selectedServiceIds.length > 0 ? '' : 'Search services…'}
+              />
             </fieldset>
 
             {/* Staff */}
