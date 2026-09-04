@@ -1,10 +1,9 @@
-﻿'use client';
+'use client';
 
 import { useState, useTransition } from 'react';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Button } from '@/components/ui/button';
-import { ModeToggle } from '@/components/ui/theme-toggle';
 import { SmartTimeInput } from '@/components/smart-time-input';
 import { updateSalonSettings } from '@/app/actions/owner/salon';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
@@ -125,8 +124,6 @@ export function BusinessProfileForm({
             </label>
           ))}
         </div>
-        <Label className="text-xs mt-2 mb-1">Theme</Label>
-        <ModeToggle />
       </div>
 
       <Button type="submit" size="sm" className="self-start mt-2" disabled={isPending}>

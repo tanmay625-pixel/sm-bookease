@@ -5,6 +5,7 @@ import { UserButton } from '@clerk/nextjs';
 import type { SalonRow } from '@/lib/supabase/types';
 import { OwnerSidebarNav, OwnerMobileNav } from '@/components/owner/owner-nav';
 import { Scissors } from 'lucide-react';
+import { ModeToggle } from '@/components/ui/theme-toggle';
 
 /**
  * Owner route group layout.
@@ -60,10 +61,13 @@ export default async function OwnerLayout({
         {/* Dynamic Nav items with active tab state */}
         <OwnerSidebarNav slug={slug} />
 
-        {/* User button */}
-        <div className="flex items-center gap-2 border-t border-sidebar-border px-4 py-4">
-          <UserButton />
-          <span className="text-xs text-sidebar-foreground truncate">My account</span>
+        {/* User button & theme toggle */}
+        <div className="flex items-center justify-between border-t border-sidebar-border px-4 py-3">
+          <div className="flex items-center gap-2 min-w-0">
+            <UserButton />
+            <span className="text-xs text-sidebar-foreground truncate">My account</span>
+          </div>
+          <ModeToggle />
         </div>
       </aside>
 
@@ -75,7 +79,10 @@ export default async function OwnerLayout({
           </div>
           <span className="text-sm font-semibold truncate max-w-[160px]">{salon.name}</span>
         </div>
-        <UserButton />
+        <div className="flex items-center gap-2">
+          <ModeToggle />
+          <UserButton />
+        </div>
       </div>
 
       {/* ── Mobile bottom nav with active tab state ─────── */}

@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import { Scissors, LogOut } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { customerLogout } from '@/app/actions/customer/auth';
+import { ModeToggle } from '@/components/ui/theme-toggle';
 import Link from 'next/link';
 
 interface CustomerHeaderProps {
@@ -33,29 +34,32 @@ export function CustomerHeader({ slug, phone }: CustomerHeaderProps) {
         <span className="text-sm font-semibold text-foreground">BookMi</span>
       </Link>
 
-      {phone ? (
-        <div className="flex items-center gap-2">
-          <span className="text-xs text-muted-foreground truncate max-w-[120px]">
-            {phone}
-          </span>
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={handleLogout}
-            disabled={isPending}
-            className="h-7 px-2 text-xs text-muted-foreground hover:text-foreground hover:bg-muted gap-1"
-            title="Sign out"
-            aria-label="Sign out"
-          >
-            <LogOut className="size-3.5" />
-            <span className="hidden sm:inline text-[11px]">Sign out</span>
+      <div className="flex items-center gap-2">
+        <ModeToggle />
+        {phone ? (
+          <div className="flex items-center gap-2">
+            <span className="text-xs text-muted-foreground truncate max-w-[120px]">
+              {phone}
+            </span>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={handleLogout}
+              disabled={isPending}
+              className="h-7 px-2 text-xs text-muted-foreground hover:text-foreground hover:bg-muted gap-1"
+              title="Sign out"
+              aria-label="Sign out"
+            >
+              <LogOut className="size-3.5" />
+              <span className="hidden sm:inline text-[11px]">Sign out</span>
+            </Button>
+          </div>
+        ) : (
+          <Button variant="ghost" size="sm" asChild className="h-7 px-2.5 text-xs">
+            <Link href={`/${slug}/sign-in`}>Sign in</Link>
           </Button>
-        </div>
-      ) : (
-        <Button variant="ghost" size="sm" asChild className="h-7 px-2.5 text-xs">
-          <Link href={`/${slug}/sign-in`}>Sign in</Link>
-        </Button>
-      )}
+        )}
+      </div>
     </header>
   );
 }
