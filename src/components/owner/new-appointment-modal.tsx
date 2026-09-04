@@ -194,6 +194,13 @@ export function NewAppointmentModal({
       return;
     }
 
+    // Guard: for new appointments, reject if the slot has already passed by submit time
+    if (!isEdit && toIST(date, selectedTime).getTime() <= Date.now()) {
+      setError('Selected time has already passed. Please choose a future time.');
+      setAvailability({ available: false, conflictReason: 'This time slot has already passed.' });
+      return;
+    }
+
     if (!isEdit && (!clientName || !clientPhone)) {
       setError('Client name and phone are required.');
       return;

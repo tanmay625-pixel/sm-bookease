@@ -308,6 +308,11 @@ export async function createAppointmentAsCustomer(
   const slotStart = new Date(input.slotStart);
   const slotEnd = new Date(slotStart.getTime() + totalDurationMinutes * 60 * 1_000);
 
+  // Guard: reject if the slot has already passed by the time the request arrives
+  if (slotStart.getTime() <= Date.now()) {
+    throw new Error('This time slot has already passed. Please select a future time.');
+  }
+
   // Fetch all staff for this salon
   const { data: staffData } = await supabase
     .from('staff')

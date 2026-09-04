@@ -97,6 +97,11 @@ export async function createAppointmentAsOwner(
   const userId = await requireAuth();
   const supabase = createClerkSupabaseClient();
 
+  // Guard: reject if the slot is in the past at the time the request arrives
+  if (new Date(input.slotStart).getTime() <= Date.now()) {
+    throw new Error('Selected appointment time is in the past.');
+  }
+
   // Fresh conflict check immediately before insert — protects against race conditions
   const { data: conflictsData } = await supabase
     .from('appointments')

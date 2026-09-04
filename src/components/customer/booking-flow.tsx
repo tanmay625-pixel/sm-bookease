@@ -139,6 +139,14 @@ export function BookingFlow({
     if (selectedServices.length === 0 || !availability?.available) return;
     if (!isSignedIn) return; // UI already shows sign-in prompt
 
+    // Pre-flight: guard against the slot expiring while the user sat on step 4
+    const slotStartTime = toIST(date, selectedTime).getTime();
+    if (slotStartTime <= Date.now()) {
+      setBookingError('Selected time has already passed. Please go back and select a new time.');
+      setAvailability({ available: false, conflictReason: 'This time slot has already passed.' });
+      return;
+    }
+
     setBookingError(null);
     startBooking(async () => {
       try {
