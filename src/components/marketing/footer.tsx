@@ -6,10 +6,10 @@ const footerSections = [
   {
     title: "Product",
     links: [
-      { label: "BookMi", href: "/products/bookmi" },
-      { label: "Features", href: "/products/bookmi/features" },
-      { label: "Pricing", href: "/products/bookmi/pricing" },
-      { label: "Demo", href: "/products/bookmi/demo" },
+      { label: "BookMi", href: "/" },
+      { label: "Features", href: "/features" },
+      { label: "Pricing", href: "/pricing" },
+      { label: "Demo", href: "/demo" },
     ],
   },
   {
@@ -48,7 +48,7 @@ export default function Footer() {
               <span className="font-heading text-sm font-semibold tracking-tight">
                 Sable Mesa
               </span> */}
-              <Image src="/logo_background_black-cropped.png" alt="Sable Mesa" width={120} height={100}/>
+              <Image src="/icon-192x192.png" alt="BookMi" width={120} height={120} />
             </Link>
             <p className="mt-3 max-w-xs text-sm text-muted-foreground leading-relaxed">
               A software studio building focused SaaS products for niche

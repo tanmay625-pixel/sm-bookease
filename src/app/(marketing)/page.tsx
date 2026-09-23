@@ -194,7 +194,7 @@ export default async function Home() {
           </div>
           <div className="mt-10 text-center">
             <Button variant="outline" size="lg" asChild>
-              <Link href="/products/BookMi/features">
+              <Link href="/features">
                 See all features
                 <ArrowRight data-icon="inline-end" />
               </Link>
