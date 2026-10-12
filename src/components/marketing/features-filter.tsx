@@ -1,30 +1,7 @@
 "use client";
 
 import { useState, useMemo } from "react";
-import Link from "next/link";
-import {
-  Globe,
-  Smartphone,
-  Sparkles,
-  Clock,
-  CalendarDays,
-  Users,
-  CheckCircle2,
-  ShieldCheck,
-  MessageSquare,
-  CreditCard,
-  TrendingUp,
-  Package,
-  Award,
-  Building2,
-  Zap,
-  Search,
-  ArrowRight,
-  RefreshCw,
-  Bell,
-  SlidersHorizontal,
-} from "lucide-react";
-import { Badge } from "@/components/ui/badge";
+import { Search, SlidersHorizontal } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 
@@ -34,11 +11,18 @@ export interface FeatureItem {
   category: "booking" | "operations" | "staff" | "crm" | "roadmap";
   status: "live" | "in-development" | "planned";
   target: "customer" | "owner" | "both";
-  icon: React.ElementType;
   tagline: string;
   description: string;
   highlights: string[];
 }
+
+const categoryLabels: Record<FeatureItem["category"], string> = {
+  booking: "Booking PWA",
+  operations: "Front Desk",
+  staff: "Team & Roster",
+  crm: "Client CRM",
+  roadmap: "Upcoming",
+};
 
 const featuresData: FeatureItem[] = [
   // Live: Customer Experience & Booking
@@ -48,7 +32,6 @@ const featuresData: FeatureItem[] = [
     category: "booking",
     status: "live",
     target: "both",
-    icon: Globe,
     tagline: "Your brand, your custom link, zero friction.",
     description:
       "Every salon gets a personalized URL slug (e.g. bookmi.in/glam-salon). Clients open the link directly from your Instagram bio, Google Maps, or WhatsApp without needing to download any app from the Play Store or App Store.",
@@ -64,7 +47,6 @@ const featuresData: FeatureItem[] = [
     category: "booking",
     status: "live",
     target: "customer",
-    icon: Sparkles,
     tagline: "Clients can bundle haircut, spa, and beard care in one go.",
     description:
       "Gone are the days where clients had to book multiple appointments for different treatments. BookMi dynamically calculates total service duration, checks available staff, and tallies pricing in ₹ INR automatically.",
@@ -80,7 +62,6 @@ const featuresData: FeatureItem[] = [
     category: "booking",
     status: "live",
     target: "customer",
-    icon: Smartphone,
     tagline: "Zero passwords. Sign in with a phone number in 5 seconds.",
     description:
       "Customers don't want to remember passwords for booking a haircut. We verify customer identities securely via SMS OTP, storing secure encrypted session cookies for effortless future visits.",
@@ -96,7 +77,6 @@ const featuresData: FeatureItem[] = [
     category: "booking",
     status: "live",
     target: "customer",
-    icon: Users,
     tagline: "Let loyal clients choose their favorite stylist.",
     description:
       "Clients can request their regular stylist or select 'Any Available' for the earliest open time slot. BookMi handles the schedule math seamlessly in the background.",
@@ -112,7 +92,6 @@ const featuresData: FeatureItem[] = [
     category: "booking",
     status: "live",
     target: "customer",
-    icon: RefreshCw,
     tagline: "Clients can check tokens, times, and past services anytime.",
     description:
       "Customers can access their personal booking history page at any time to review upcoming appointments, check live status, or see past services without having to message or call the reception.",
@@ -130,7 +109,6 @@ const featuresData: FeatureItem[] = [
     category: "operations",
     status: "live",
     target: "owner",
-    icon: ShieldCheck,
     tagline: "Mathematical certainty against scheduling overlaps.",
     description:
       "Our specialized availability engine continuously checks stylist rosters, existing appointments, and duration buffers to guarantee that two clients are never scheduled with the same stylist simultaneously.",
@@ -146,7 +124,6 @@ const featuresData: FeatureItem[] = [
     category: "operations",
     status: "live",
     target: "owner",
-    icon: CalendarDays,
     tagline: "Complete oversight across day, week, and month views.",
     description:
       "A fast, modern calendar tailored specifically for appointment heavy businesses. View every chair, stylist, and time slot clearly with color-coded appointment statuses.",
@@ -162,7 +139,6 @@ const featuresData: FeatureItem[] = [
     category: "operations",
     status: "live",
     target: "owner",
-    icon: Zap,
     tagline: "Book offline walk-in customers in under 15 seconds.",
     description:
       "Not every customer books online. Front-desk staff can punch in walk-ins with smart time inputs, custom stylist selection, and instant slot validation so all appointments stay in one single system.",
@@ -178,7 +154,6 @@ const featuresData: FeatureItem[] = [
     category: "operations",
     status: "live",
     target: "both",
-    icon: Clock,
     tagline: "Engineered specifically for Indian service businesses.",
     description:
       "All slot computation, business opening hours, and calendar boundaries operate strictly on Indian Standard Time (UTC+5:30), eliminating the frustrating timezone offsets found in foreign software.",
@@ -196,7 +171,6 @@ const featuresData: FeatureItem[] = [
     category: "staff",
     status: "live",
     target: "owner",
-    icon: Users,
     tagline: "Configure shifts, working hours, and specialist skills.",
     description:
       "Manage multiple team members with individual weekly working hours, active statuses, and service specializations. Keep part-time and full-time stylists scheduled accurately.",
@@ -212,7 +186,6 @@ const featuresData: FeatureItem[] = [
     category: "crm",
     status: "live",
     target: "owner",
-    icon: Users,
     tagline: "Turn first-time visitors into loyal regulars.",
     description:
       "Keep track of client contact details, lifetime visits, preferred stylists, and appointment history. Know exactly who is sitting in your salon chair before they even speak.",
@@ -230,7 +203,6 @@ const featuresData: FeatureItem[] = [
     category: "roadmap",
     status: "in-development",
     target: "both",
-    icon: MessageSquare,
     tagline: "Cut salon no-shows by up to 80% automatically.",
     description:
       "Send automatic booking confirmation messages and 2-hour reminders straight to the customer's WhatsApp. Allow clients to confirm or reschedule with a single tap.",
@@ -246,7 +218,6 @@ const featuresData: FeatureItem[] = [
     category: "roadmap",
     status: "planned",
     target: "both",
-    icon: CreditCard,
     tagline: "Collect advance booking tokens via GPay, PhonePe & Paytm.",
     description:
       "Stop losing money on weekend no-shows. Require clients to pay a small advance token (e.g. ₹100) or full payment via UPI QR codes, cards, or netbanking before their slot is reserved.",
@@ -262,7 +233,6 @@ const featuresData: FeatureItem[] = [
     category: "roadmap",
     status: "planned",
     target: "owner",
-    icon: TrendingUp,
     tagline: "Data-driven insights to grow your salon's bottom line.",
     description:
       "Visualize your highest-earning services, busiest days and hours, client retention percentages, and individual stylist commission reports in beautiful visual charts.",
@@ -278,7 +248,6 @@ const featuresData: FeatureItem[] = [
     category: "roadmap",
     status: "planned",
     target: "owner",
-    icon: Package,
     tagline: "Sell shampoos, waxes, and treatments at checkout.",
     description:
       "Combine service appointments and retail product sales into a single invoice. Track stock levels, get alerts when serums or kits run low, and boost retail margins.",
@@ -294,7 +263,6 @@ const featuresData: FeatureItem[] = [
     category: "roadmap",
     status: "planned",
     target: "both",
-    icon: Award,
     tagline: "Reward regular customers and sell prepaid packages.",
     description:
       "Offer packages like 'Buy 5 Haircuts, Get 1 Free' or reward clients with loyalty points redeemable for styling upgrades. Drive recurring revenue and long-term salon loyalty.",
@@ -310,7 +278,6 @@ const featuresData: FeatureItem[] = [
     category: "roadmap",
     status: "planned",
     target: "owner",
-    icon: Building2,
     tagline: "Oversee multiple salon outlets from one master dashboard.",
     description:
       "Operating 2 or more locations? Switch between outlets instantly, view combined financial reports, and transfer staff between branches while keeping local calendars separated.",
@@ -323,6 +290,81 @@ const featuresData: FeatureItem[] = [
 ];
 
 type FilterTab = "all" | "live" | "roadmap" | "booking" | "operations";
+
+function FeatureCard({ feature }: { feature: FeatureItem }) {
+  const isLive = feature.status === "live";
+  const isInDev = feature.status === "in-development";
+
+  return (
+    <div
+      className={cn(
+        "group relative flex flex-col justify-between rounded-xl border bg-card p-5 shadow-xs transition-all duration-300 hover:shadow-md",
+        isLive
+          ? "border-border hover:border-primary/50"
+          : "border-dashed border-border/80 bg-card/60 hover:border-primary/40"
+      )}
+    >
+      <div>
+        {/* Header Row: Category Tag + Status Badge */}
+        <div className="flex items-center justify-between gap-2">
+          <span className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground/70">
+            {categoryLabels[feature.category]}
+          </span>
+
+          <div>
+            {isLive ? (
+              <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-500/10 px-2 py-0.5 text-[11px] font-semibold text-emerald-700 dark:text-emerald-400">
+                <span className="size-1.5 rounded-full bg-emerald-500" />
+                Live
+              </span>
+            ) : isInDev ? (
+              <span className="inline-flex items-center rounded-full bg-amber-500/10 px-2 py-0.5 text-[11px] font-semibold text-amber-700 dark:text-amber-400">
+                In Progress
+              </span>
+            ) : (
+              <span className="inline-flex items-center rounded-full bg-blue-500/10 px-2 py-0.5 text-[11px] font-semibold text-blue-700 dark:text-blue-400">
+                Planned
+              </span>
+            )}
+          </div>
+        </div>
+
+        {/* Always-Visible: Heading & Subheading */}
+        <div className="mt-3">
+          <h3 className="font-heading text-base font-semibold tracking-tight text-foreground transition-colors group-hover:text-primary">
+            {feature.title}
+          </h3>
+          <p className="mt-1 text-xs text-muted-foreground leading-relaxed">
+            {feature.tagline}
+          </p>
+        </div>
+      </div>
+
+      {/* Expandable Section: Triggers purely on hover */}
+      <div className="grid grid-rows-[0fr] transition-[grid-template-rows] duration-300 ease-in-out group-hover:grid-rows-[1fr]">
+        <div className="overflow-hidden opacity-0 transition-opacity duration-300 group-hover:opacity-100">
+          <div className="mt-4 border-t pt-3">
+            <p className="text-xs leading-relaxed text-muted-foreground">
+              {feature.description}
+            </p>
+
+            <ul className="mt-3 space-y-1.5">
+              {feature.highlights.map((h, i) => (
+                <li
+                  key={i}
+                  className="flex items-start gap-2 text-xs text-foreground/85"
+                >
+                  <span className="mt-1.5 size-1 shrink-0 rounded-full bg-primary" />
+                  <span>{h}</span>
+                </li>
+              ))}
+            </ul>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
 
 export default function FeaturesFilter() {
   const [activeTab, setActiveTab] = useState<FilterTab>("all");
@@ -406,7 +448,6 @@ export default function FeaturesFilter() {
                 : "bg-muted text-muted-foreground hover:bg-muted/80 hover:text-foreground"
             )}
           >
-            <Sparkles className="size-3.5" />
             Roadmap ({roadmapCount})
           </button>
           <button
@@ -454,99 +495,55 @@ export default function FeaturesFilter() {
         </div>
       </div>
 
-      {/* Feature Grid */}
-      <div className="mt-8 grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-3">
-        {filteredFeatures.map((feature) => {
-          const Icon = feature.icon;
-          const isLive = feature.status === "live";
-          const isInDev = feature.status === "in-development";
+      {/* Feature Columns: Each column moves independently on hover */}
+      {/* Desktop (3 Columns) */}
+      <div className="mt-8 hidden lg:grid lg:grid-cols-3 gap-4 items-start">
+        <div className="flex flex-col gap-4">
+          {filteredFeatures
+            .filter((_, i) => i % 3 === 0)
+            .map((feature) => (
+              <FeatureCard key={feature.id} feature={feature} />
+            ))}
+        </div>
+        <div className="flex flex-col gap-4">
+          {filteredFeatures
+            .filter((_, i) => i % 3 === 1)
+            .map((feature) => (
+              <FeatureCard key={feature.id} feature={feature} />
+            ))}
+        </div>
+        <div className="flex flex-col gap-4">
+          {filteredFeatures
+            .filter((_, i) => i % 3 === 2)
+            .map((feature) => (
+              <FeatureCard key={feature.id} feature={feature} />
+            ))}
+        </div>
+      </div>
 
-          return (
-            <div
-              key={feature.id}
-              className={cn(
-                "group relative flex flex-col justify-between rounded-xl border bg-card p-6 shadow-xs transition-all duration-200 hover:-translate-y-1 hover:shadow-md",
-                isLive
-                  ? "border-border hover:border-primary/40"
-                  : "border-dashed border-border/80 bg-card/60"
-              )}
-            >
-              <div>
-                {/* Header row: Icon & Status Badge */}
-                <div className="flex items-start justify-between gap-3">
-                  <span
-                    className={cn(
-                      "flex size-11 items-center justify-center rounded-lg transition-colors",
-                      isLive
-                        ? "bg-primary/10 text-primary group-hover:bg-primary group-hover:text-primary-foreground"
-                        : isInDev
-                        ? "bg-amber-500/10 text-amber-600 dark:text-amber-400"
-                        : "bg-blue-500/10 text-blue-600 dark:text-blue-400"
-                    )}
-                  >
-                    <Icon className="size-5" />
-                  </span>
+      {/* Tablet (2 Columns) */}
+      <div className="mt-8 hidden md:grid lg:hidden md:grid-cols-2 gap-4 items-start">
+        <div className="flex flex-col gap-4">
+          {filteredFeatures
+            .filter((_, i) => i % 2 === 0)
+            .map((feature) => (
+              <FeatureCard key={feature.id} feature={feature} />
+            ))}
+        </div>
+        <div className="flex flex-col gap-4">
+          {filteredFeatures
+            .filter((_, i) => i % 2 === 1)
+            .map((feature) => (
+              <FeatureCard key={feature.id} feature={feature} />
+            ))}
+        </div>
+      </div>
 
-                  <div className="flex items-center gap-1.5">
-                    {isLive ? (
-                      <span className="inline-flex items-center gap-1 rounded-full bg-emerald-500/10 px-2.5 py-0.5 text-xs font-semibold text-emerald-700 dark:text-emerald-400">
-                        <span className="size-1.5 rounded-full bg-emerald-500" />
-                        Live
-                      </span>
-                    ) : isInDev ? (
-                      <span className="inline-flex items-center gap-1 rounded-full bg-amber-500/10 px-2.5 py-0.5 text-xs font-semibold text-amber-700 dark:text-amber-400">
-                        In Progress
-                      </span>
-                    ) : (
-                      <span className="inline-flex items-center gap-1 rounded-full bg-blue-500/10 px-2.5 py-0.5 text-xs font-semibold text-blue-700 dark:text-blue-400">
-                        Planned
-                      </span>
-                    )}
-                  </div>
-                </div>
-
-                {/* Title & Tagline */}
-                <div className="mt-4">
-                  <h3 className="font-heading text-lg font-semibold tracking-tight text-foreground group-hover:text-primary transition-colors">
-                    {feature.title}
-                  </h3>
-                  <p className="mt-1 text-xs font-medium text-primary/80">
-                    {feature.tagline}
-                  </p>
-                </div>
-
-                {/* Description */}
-                <p className="mt-3 text-sm text-muted-foreground leading-relaxed">
-                  {feature.description}
-                </p>
-              </div>
-
-              {/* Highlights List */}
-              <div className="mt-6 border-t pt-4">
-                <ul className="space-y-1.5">
-                  {feature.highlights.map((h, i) => (
-                    <li
-                      key={i}
-                      className="flex items-center gap-2 text-xs text-muted-foreground"
-                    >
-                      <CheckCircle2
-                        className={cn(
-                          "size-3.5 shrink-0",
-                          isLive
-                            ? "text-primary"
-                            : isInDev
-                            ? "text-amber-500"
-                            : "text-blue-500"
-                        )}
-                      />
-                      <span>{h}</span>
-                    </li>
-                  ))}
-                </ul>
-              </div>
-            </div>
-          );
-        })}
+      {/* Mobile (1 Column) */}
+      <div className="mt-8 flex flex-col gap-4 md:hidden">
+        {filteredFeatures.map((feature) => (
+          <FeatureCard key={feature.id} feature={feature} />
+        ))}
       </div>
 
       {filteredFeatures.length === 0 && (

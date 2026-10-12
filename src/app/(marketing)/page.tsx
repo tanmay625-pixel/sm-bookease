@@ -119,13 +119,10 @@ export default async function Home() {
             </p>
             <div className="mt-8 flex flex-col items-center justify-center gap-3 sm:flex-row">
               <Button size="lg" asChild>
-                <Link href="/products/bookmi/pricing">
+                <Link href="/pilot">
                   Start Free Pilot
                   <ArrowRight data-icon="inline-end" />
                 </Link>
-              </Button>
-              <Button size="lg" variant="outline" asChild>
-                <Link href="/products/bookmi/demo">View demo</Link>
               </Button>
             </div>
           </div>
@@ -211,11 +208,11 @@ export default async function Home() {
               Start your free pilot
             </h2>
             <p className="mx-auto mt-3 max-w-xl text-primary-foreground/90 leading-relaxed">
-              Join the first 10 businesses on BookMi and get 3 months free.
+              Join the pilot program on BookMi and get 4 weeks free.
             </p>
             <div className="mt-6">
               <Button size="lg" variant="secondary" asChild>
-                <Link href="/products/BookMi/pricing">
+                <Link href="/pilot">
                   Start Free Pilot
                   <ArrowRight data-icon="inline-end" />
                 </Link>

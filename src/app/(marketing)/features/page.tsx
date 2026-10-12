@@ -2,15 +2,10 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import {
   ArrowRight,
-  Sparkles,
   CheckCircle2,
   XCircle,
   HelpCircle,
-  Layers,
-  Zap,
   CalendarCheck,
-  Shield,
-  Smartphone,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -76,7 +71,7 @@ export default function FeaturesPage() {
         <div className="relative mx-auto max-w-6xl px-4 py-16 sm:px-6 md:py-24">
           <div className="mx-auto max-w-3xl text-center">
             <div className="mb-4 inline-flex items-center gap-2 rounded-full border bg-background/80 px-3.5 py-1 text-xs font-medium shadow-xs backdrop-blur-xs">
-              <Sparkles className="size-3.5 text-primary" />
+              <span className="size-1.5 rounded-full bg-primary" />
               <span>Features & Product Suite</span>
               <span className="text-muted-foreground">&middot;</span>
               <span className="text-primary font-semibold">Live + Roadmap</span>
@@ -94,7 +89,7 @@ export default function FeaturesPage() {
 
             <div className="mt-8 flex flex-col items-center justify-center gap-3 sm:flex-row">
               <Button size="lg" asChild>
-                <Link href="/sign-up">
+                <Link href="/pilot">
                   Start 4-Week Free Pilot
                   <ArrowRight data-icon="inline-end" />
                 </Link>
@@ -239,7 +234,7 @@ export default function FeaturesPage() {
           </p>
           <div className="mt-8 flex flex-col items-center justify-center gap-3 sm:flex-row">
             <Button size="lg" asChild>
-              <Link href="/sign-up">
+              <Link href="/pilot">
                 Start Your 4-Week Free Pilot
                 <ArrowRight data-icon="inline-end" />
               </Link>

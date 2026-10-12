@@ -9,15 +9,15 @@ const footerSections = [
       { label: "BookMi", href: "/" },
       { label: "Features", href: "/features" },
       { label: "Pricing", href: "/pricing" },
-      { label: "Demo", href: "/demo" },
+      { label: "Pilot Program", href: "/pilot" },
     ],
   },
   {
     title: "Company",
     links: [
-      { label: "About", href: "/about" },
-      { label: "Blog", href: "/blog" },
-      { label: "Contact", href: "/contact" },
+      { label: "About", href: "https://sablemesa.in/about/" },
+      { label: "Blog", href: "https://sablemesa.in/blog/" },
+      { label: "Contact", href: "https://sablemesa.in/contact/" },
     ],
   },
   {
@@ -74,16 +74,31 @@ export default function Footer() {
                 {section.title}
               </h3>
               <ul className="mt-3 flex flex-col gap-2 text-sm text-muted-foreground">
-                {section.links.map((link) => (
-                  <li key={link.href}>
-                    <Link
-                      href={link.href}
-                      className="transition-colors hover:text-foreground"
-                    >
-                      {link.label}
-                    </Link>
-                  </li>
-                ))}
+                {section.links.map((link) => {
+                  const isExternal = link.href.startsWith("http");
+
+                  return (
+                    <li key={link.href}>
+                      {isExternal ? (
+                        <a
+                          href={link.href}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="transition-colors hover:text-foreground"
+                        >
+                          {link.label}
+                        </a>
+                      ) : (
+                        <Link
+                          href={link.href}
+                          className="transition-colors hover:text-foreground"
+                        >
+                          {link.label}
+                        </Link>
+                      )}
+                    </li>
+                  );
+                })}
               </ul>
             </div>
           ))}

@@ -25,7 +25,7 @@ import {
 const navItems = [
   { label: "Features", href: "/features" },
   { label: "Pricing", href: "/pricing" },
-  { label: "Demo", href: "/demo" },
+  { label: "Pilot Program", href: "/pilot" },
 ];
 
 export default function Navbar() {
@@ -71,7 +71,7 @@ export default function Navbar() {
 
         <div className="hidden items-center gap-2 md:flex">
           <Button variant="ghost" size="lg" asChild>
-            <Link href="/contact">Contact</Link>
+            <a rel="noopener noreferrer" target="_blank" href="https://sablemesa.in/contact/">Contact</a>
           </Button>
           <Button size="lg" asChild>
             <Link href="/sign-up">Get Started</Link>
