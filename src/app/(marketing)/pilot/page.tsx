@@ -22,7 +22,7 @@ export const metadata: Metadata = {
  * All page text is isolated here so you can easily update wording,
  * pricing, or timelines without touching the layout code.
  */
-export const PILOT_COPY = {
+const PILOT_COPY = {
   hero: {
     badge: "Early Access Program",
     headline: "Join the BookMi Pilot Program",
