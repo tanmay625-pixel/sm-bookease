@@ -1,0 +1,28 @@
+import NavBar from "@/components/marketing/navbar";
+import Footer from "@/components/marketing/footer";
+import React from "react";
+import { Geist, Geist_Mono } from "next/font/google";
+
+const geist = Geist({
+    subsets: ["latin"],
+    variable: "--font-geist-sans",
+});
+
+const geistMono = Geist_Mono({
+    subsets: ["latin"],
+    variable: "--font-geist-mono",
+});
+
+export default function MarketingLayout({
+    children,
+}: {
+    children: React.ReactNode;
+}) {
+    return (
+        <div className={`${geist.className} ${geistMono.variable}`}>
+            <NavBar />
+            <main>{children}</main>
+            <Footer />
+        </div>
+    );
+}
