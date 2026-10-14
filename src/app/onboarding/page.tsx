@@ -5,6 +5,15 @@ import { createClerkSupabaseClient } from '@/lib/supabase/server';
 import { OnboardingForm } from './onboarding-form';
 import { Scissors } from 'lucide-react';
 import { UserButton } from '@clerk/nextjs';
+import type { Metadata } from 'next';
+
+export const metadata: Metadata = {
+  title: 'Onboarding — BookMi',
+  robots: {
+    index: false,
+    follow: false,
+  },
+};
 
 export default async function OnboardingPage() {
   const { userId } = await auth();

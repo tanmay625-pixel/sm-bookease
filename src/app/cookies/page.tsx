@@ -5,6 +5,10 @@ import { Button } from "@/components/ui/button";
 export const metadata = {
   title: "Cookie Policy — BookMi",
   description: "Learn how BookMi uses cookies to power secure salon bookings and authentication.",
+  robots: {
+    index: false,
+    follow: false,
+  },
 };
 
 export default function CookiesPage() {

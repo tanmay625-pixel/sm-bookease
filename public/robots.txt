@@ -1,0 +1,20 @@
+# *
+User-agent: *
+Allow: /
+Disallow: /api/
+Disallow: /cookies
+Disallow: /onboarding
+Disallow: /sign-in
+Disallow: /sign-up
+Disallow: /*/dashboard
+Disallow: /*/appointments
+Disallow: /*/calendar
+Disallow: /*/clients
+Disallow: /*/settings
+Disallow: /*/history
+
+# Host
+Host: https://bookmi.sablemesa.in
+
+# Sitemaps
+Sitemap: https://bookmi.sablemesa.in/sitemap.xml

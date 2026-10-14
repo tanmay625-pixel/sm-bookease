@@ -1,6 +1,15 @@
 import { SignUp } from "@clerk/nextjs";
 import Link from "next/link";
 import { Scissors } from "lucide-react";
+import type { Metadata } from "next";
+
+export const metadata: Metadata = {
+  title: "Create Account — BookMi",
+  robots: {
+    index: false,
+    follow: false,
+  },
+};
 
 export default function SignUpPage() {
   return (
