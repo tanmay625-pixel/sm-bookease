@@ -4,7 +4,7 @@ import { cookies } from 'next/headers';
 import { revalidatePath } from 'next/cache';
 import { createServiceSupabaseClient } from '@/lib/supabase/service';
 import { generateOtp, storeOtp, verifyStoredOtp, signSessionCookie, verifySessionCookie } from '@/lib/otp';
-import { sendWhatsAppMessage } from '@/lib/whatsapp';
+import { sendAuthOtp } from '@/lib/notifications';
 import type { SalonRow, CustomerRow } from '@/lib/supabase/types';
 
 const SESSION_COOKIE_NAME = 'bookmi_session';
@@ -13,7 +13,7 @@ const SESSION_COOKIE_MAX_AGE = 60 * 60 * 24 * 7; // 7 days in seconds
 // ─────────────────────────────────────────────
 // requestOtp
 // Looks up the salon by slug, generates a 6-digit OTP, stores the hash,
-// and sends it via WhatsApp.
+// and sends it via SMS or WhatsApp depending on OTP_PROVIDER.
 // ─────────────────────────────────────────────
 
 export async function requestOtp(
@@ -42,27 +42,23 @@ export async function requestOtp(
     return { ok: false, error: 'Failed to store OTP — please try again' };
   }
 
-  // Dev fallback: log OTP to console so the flow is testable before WhatsApp
-  // template approval.
+  // Dev fallback: log OTP to console so the flow is testable
   if (process.env.NODE_ENV === 'development') {
     console.log(`[DEV] OTP for ${phone} at ${salonSlug}: ${code}`);
   }
 
-  // TODO: confirm exact template name once approved by Meta
-  const { success, error: waError } = await sendWhatsAppMessage(
+  const { success, error: sendError, channel } = await sendAuthOtp(
     phone,
-    'bookmi_otp', // TODO: confirm exact template name once approved
-    'en',
-    [code],
+    code,
     salon.id
   );
 
   if (!success) {
-    // WhatsApp delivery failed — log OTP to server logs so the owner
-    // can still test the flow while Meta verification is pending.
+    // Delivery failed — log OTP to server logs so the owner
+    // can still test the flow while credentials/verification are pending.
     // This log is only visible in Vercel Function Logs (server-side),
     // never exposed to the client.
-    console.warn(`[OTP FALLBACK] WhatsApp failed for ${phone} at ${salonSlug}: ${waError}`);
+    console.warn(`[OTP FALLBACK] ${channel.toUpperCase()} failed for ${phone} at ${salonSlug}: ${sendError}`);
     console.warn(`[OTP FALLBACK] Code: ${code}`);
   }
 

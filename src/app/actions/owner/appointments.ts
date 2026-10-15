@@ -4,7 +4,7 @@ import { auth } from '@clerk/nextjs/server';
 import { redirect } from 'next/navigation';
 import { revalidatePath } from 'next/cache';
 import { createClerkSupabaseClient } from '@/lib/supabase/server';
-import { sendWhatsAppMessage } from '@/lib/whatsapp';
+import { sendAppointmentConfirmation } from '@/lib/notifications';
 import type { Database, CustomerRow, ServiceRow, StaffRow } from '@/lib/supabase/types';
 import { findConflictingStaffIds } from '@/lib/availability';
 
@@ -365,27 +365,23 @@ export async function updateAppointmentStatus(
 
   if (error) throw new Error(`Failed to update appointment status: ${error.message}`);
 
-  // Send WhatsApp confirmation when status transitions to 'confirmed'
+  // Send confirmation notification when status transitions to 'confirmed'
   if (status === 'confirmed') {
     const customer = existing.customers as CustomerRow | null;
     if (customer?.phone) {
-      // TODO: confirm exact template name once approved by Meta
-      await sendWhatsAppMessage(
+      const formattedDate = new Date(existing.slot_start).toLocaleString('en-IN', {
+        timeZone: 'Asia/Kolkata',
+        dateStyle: 'medium',
+        timeStyle: 'short',
+      });
+      await sendAppointmentConfirmation(
         customer.phone,
-        'appointment_confirmed',  // TODO: confirm exact template name once approved
-        'en',
-        [
-          customer.name,
-          new Date(existing.slot_start).toLocaleString('en-IN', {
-            timeZone: 'Asia/Kolkata',
-            dateStyle: 'medium',
-            timeStyle: 'short',
-          }),
-        ],
+        customer.name,
+        formattedDate,
         existing.salon_id
       ).catch((err) => {
         // Non-fatal — log but don't fail the status update
-        console.error('[updateAppointmentStatus] WhatsApp send failed:', err);
+        console.error('[updateAppointmentStatus] Confirmation notification send failed:', err);
       });
     }
   }

@@ -170,9 +170,9 @@ function OtpSignInContent({ slug }: OtpSignInProps) {
         </h1>
         <p className="text-xs text-muted-foreground text-center">
           {step === 'phone'
-            ? 'Enter your mobile number to get a one-time code'
+            ? 'Enter your mobile number to get a verification code'
             : step === 'otp'
-            ? `Code sent to +91 ${phone}`
+            ? `We sent a 6-digit verification code to +91 ${phone} via SMS/WhatsApp`
             : 'Please enter your name to complete your profile'}
         </p>
       </div>

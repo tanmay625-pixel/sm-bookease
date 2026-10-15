@@ -27,10 +27,15 @@ Copy `.env.local` and fill in every value. The table below explains what each va
 | `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` | ✅ | Supabase → Project Settings → API → anon/public key | Browser-side Supabase calls fail |
 | `SUPABASE_SERVICE_ROLE_KEY` | ✅ | Supabase → Project Settings → API → service_role key | Customer-path actions fail (OTP, booking) |
 | **`CUSTOMER_SESSION_SECRET`** | ✅ | Generate yourself (see below) | `verifyOtp` crashes with `DOMException` from jose; session cookies can't be signed or verified |
-| `WHATSAPP_ACCESS_TOKEN` | ⚠️ prod only | Meta for Developers → WhatsApp → API Setup → permanent System User token | OTP WhatsApp sends fail; dev falls back to console log |
-| `WHATSAPP_PHONE_NUMBER_ID` | ⚠️ prod only | Meta for Developers → WhatsApp → API Setup | Same as above |
-| `WHATSAPP_BUSINESS_ACCOUNT_ID` | ⚠️ prod only | Meta for Developers → WhatsApp → Business Account ID | Same as above |
-| `WHATSAPP_WEBHOOK_VERIFY_TOKEN` | ⚠️ prod only | Any random string you choose | Meta webhook verification GET fails |
+| `OTP_PROVIDER` | Optional (default: `sms`) | Set to `sms` or `whatsapp` | Determines whether OTP and notifications go through SMS or WhatsApp |
+| `SMS_PROVIDER` | Optional (default: `fast2sms`) | Set to `fast2sms` or `2factor` | Selects which SMS service to route through |
+| `FAST2SMS_API_KEY` | When `SMS_PROVIDER=fast2sms` | [Fast2SMS Dashboard](https://www.fast2sms.com/dashboard/dev-api) | SMS OTP & booking confirmation sends fail; dev falls back to console log |
+| `TWOFACTOR_API_KEY` | When `SMS_PROVIDER=2factor` | [2Factor.in Portal](https://2factor.in) | SMS OTP & booking confirmation sends fail via 2Factor |
+| `TWOFACTOR_SENDER_ID` | Optional | Approved 6-character sender ID (default: `BOOKMI`) | Header name on SMS alerts |
+| `WHATSAPP_ACCESS_TOKEN` | When `OTP_PROVIDER=whatsapp` | Meta for Developers → WhatsApp → API Setup → permanent System User token | WhatsApp sends fail; dev falls back to console log |
+| `WHATSAPP_PHONE_NUMBER_ID` | When `OTP_PROVIDER=whatsapp` | Meta for Developers → WhatsApp → API Setup | Same as above |
+| `WHATSAPP_BUSINESS_ACCOUNT_ID` | When `OTP_PROVIDER=whatsapp` | Meta for Developers → WhatsApp → Business Account ID | Same as above |
+| `WHATSAPP_WEBHOOK_VERIFY_TOKEN` | When `OTP_PROVIDER=whatsapp` | Any random string you choose | Meta webhook verification GET fails |
 
 ### Generating CUSTOMER_SESSION_SECRET
 
