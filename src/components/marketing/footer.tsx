@@ -48,7 +48,7 @@ export default function Footer() {
               <span className="font-heading text-sm font-semibold tracking-tight">
                 Sable Mesa
               </span> */}
-              <Image src="/icon-192x192.png" alt="BookMi" width={120} height={120} />
+              <Image src="/icon-192x192.png" alt="BookMi" className="h-10 w-10 object-contain" width={40} height={40} />
             </Link>
             <p className="mt-3 max-w-xs text-sm text-muted-foreground leading-relaxed">
               A software studio building focused SaaS products for niche

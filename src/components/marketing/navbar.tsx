@@ -48,7 +48,7 @@ export default function Navbar() {
           <span className="font-heading text-sm font-semibold tracking-tight">
             Sable Mesa
           </span> */}
-          <Image src="/icon-512x512.png" alt="Sable Mesa" width={60} height={60} />
+          <Image src="/icon-512x512.png" alt="Sable Mesa" className="h-8 w-8 object-contain" width={36} height={36} />
           <span className="text-base font-bold tracking-tight">BookMi</span>
         </Link>
 
