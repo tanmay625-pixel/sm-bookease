@@ -142,8 +142,8 @@ async function sendFast2SmsMessage(
 }
 
 /**
- * Sends an OTP using 2Factor.in API.
- * Endpoint: https://2factor.in/API/V1/{API_KEY}/SMS/{PHONE}/{OTP}/OTP1
+ * Sends an OTP using 2Factor.in text SMS API.
+ * Endpoint: https://2factor.in/API/V1/{API_KEY}/SMS/{PHONE}/{OTP}
  */
 async function send2FactorOtp(
   tenDigitPhone: string,
@@ -151,8 +151,11 @@ async function send2FactorOtp(
   apiKey: string
 ): Promise<{ success: boolean; messageId?: string; error?: string; rawResponse?: unknown }> {
   try {
-    // 2Factor expects either 10-digit number or +91 format
-    const url = `https://2factor.in/API/V1/${encodeURIComponent(apiKey)}/SMS/${encodeURIComponent(tenDigitPhone)}/${encodeURIComponent(code)}/OTP1`;
+    // 2Factor expects +91 format as shown in their official cURL:
+    // https://2factor.in/API/V1/{API_KEY}/SMS/+91{PHONE}/{OTP}/OTP1
+    const template = process.env.TWOFACTOR_OTP_TEMPLATE || 'OTP1';
+    const targetPhone = `+91${tenDigitPhone}`;
+    const url = `https://2factor.in/API/V1/${encodeURIComponent(apiKey)}/SMS/${encodeURIComponent(targetPhone)}/${encodeURIComponent(code)}/${encodeURIComponent(template)}`;
     const response = await fetch(url, {
       method: 'GET',
     });
