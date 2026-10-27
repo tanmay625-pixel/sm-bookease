@@ -46,7 +46,11 @@ export async function sendWhatsAppMessage(
   templateName: string,
   languageCode: string,
   params: string[],
-  salonId?: string
+  salonId?: string,
+  options?: {
+    components?: TemplateComponent[];
+    hasCopyCodeButton?: boolean;
+  }
 ): Promise<{ success: boolean; messageId?: string; error?: string }> {
   const phoneNumberId = process.env.WHATSAPP_PHONE_NUMBER_ID;
   const accessToken = process.env.WHATSAPP_ACCESS_TOKEN;
@@ -56,19 +60,44 @@ export async function sendWhatsAppMessage(
     return { success: false, error: 'WhatsApp not configured' };
   }
 
-  const components: TemplateComponent[] =
-    params.length > 0
-      ? [
-          {
-            type: 'body',
-            parameters: params.map((text) => ({ type: 'text' as const, text })),
-          },
-        ]
-      : [];
+  const cleanTo = to.replace(/\D/g, '');
+
+  let components: TemplateComponent[];
+
+  if (options?.components) {
+    components = options.components;
+  } else {
+    components = [];
+
+    if (params.length > 0) {
+      components.push({
+        type: 'body',
+        parameters: params.map((text) => ({ type: 'text' as const, text })),
+      });
+    }
+
+    // Authentication templates with COPY_CODE buttons (such as costumer_auth or customer_auth)
+    // require an explicit button component parameter in the Meta Cloud API payload.
+    const isAuthTemplate =
+      options?.hasCopyCodeButton ??
+      (templateName === 'costumer_auth' ||
+        templateName === 'customer_auth' ||
+        templateName.toLowerCase().includes('auth') ||
+        templateName.toLowerCase().includes('otp'));
+
+    if (isAuthTemplate && params.length > 0) {
+      components.push({
+        type: 'button',
+        sub_type: 'url',
+        index: '0',
+        parameters: [{ type: 'text', text: params[0] }],
+      });
+    }
+  }
 
   const body = {
     messaging_product: 'whatsapp',
-    to,
+    to: cleanTo,
     type: 'template',
     template: {
       name: templateName,

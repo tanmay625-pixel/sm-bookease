@@ -48,10 +48,9 @@ export async function requestOtp(
     console.log(`[DEV] OTP for ${phone} at ${salonSlug}: ${code}`);
   }
 
-  // TODO: confirm exact template name once approved by Meta
   const { success, error: waError } = await sendWhatsAppMessage(
     phone,
-    'bookmi_otp', // TODO: confirm exact template name once approved
+    'costumer_auth',
     'en',
     [code],
     salon.id
