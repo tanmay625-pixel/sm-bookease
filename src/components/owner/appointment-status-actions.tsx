@@ -1,12 +1,17 @@
 'use client';
 
 import { useState, useTransition } from 'react';
+import dynamic from 'next/dynamic';
 import { Button } from '@/components/ui/button';
 import { updateAppointmentStatus } from '@/app/actions/owner/appointments';
-import { NewAppointmentModal } from '@/components/owner/new-appointment-modal';
 import type { StaffRow, ServiceRow } from '@/lib/supabase/types';
 import type { AppointmentWithRelations } from '@/components/token-stub-card';
 import { CheckCircle, XCircle, Pencil } from 'lucide-react';
+
+const NewAppointmentModal = dynamic(
+  () => import('@/components/owner/new-appointment-modal').then((m) => m.NewAppointmentModal),
+  { ssr: false }
+);
 
 interface AppointmentStatusActionsProps {
   appointment: AppointmentWithRelations;

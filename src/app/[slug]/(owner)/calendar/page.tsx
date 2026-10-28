@@ -1,8 +1,8 @@
-import { createClerkSupabaseClient } from '@/lib/supabase/server';
+import { redirect } from 'next/navigation';
+import { getCachedOwnerSalon } from '@/lib/supabase/cached';
 import { listAppointments } from '@/app/actions/owner/appointments';
 import { listStaff } from '@/app/actions/owner/staff';
 import { listServices } from '@/app/actions/owner/services';
-import { getSalonBySlug } from '@/app/actions/owner/salon';
 import { WeekView } from '@/components/calendar/week-view';
 import { toIST, todayIST } from '@/lib/timezone';
 
@@ -22,14 +22,9 @@ export default async function CalendarPage({
 }) {
   const { slug } = await params;
 
-  const salon = await getSalonBySlug(slug);
-  if (!salon) {
-    return (
-      <div className="flex flex-1 flex-col items-center justify-center min-h-[60vh] gap-4 p-6 text-center">
-        <p className="text-sm text-muted-foreground">Salon not found.</p>
-      </div>
-    );
-  }
+  // getCachedOwnerSalon is already memoised for this request by OwnerLayout.
+  const salon = await getCachedOwnerSalon(slug);
+  if (!salon) redirect('/');
 
   // Compute Monday of the current week (ISO week starts on Monday)
   const today = todayIST();

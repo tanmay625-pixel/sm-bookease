@@ -1,10 +1,15 @@
 'use client';
 
 import { useState } from 'react';
+import dynamic from 'next/dynamic';
 import { Button } from '@/components/ui/button';
-import { NewAppointmentModal } from '@/components/owner/new-appointment-modal';
 import type { StaffRow, ServiceRow } from '@/lib/supabase/types';
 import { Plus } from 'lucide-react';
+
+const NewAppointmentModal = dynamic(
+  () => import('@/components/owner/new-appointment-modal').then((m) => m.NewAppointmentModal),
+  { ssr: false }
+);
 
 interface NewAppointmentTriggerProps {
   salonId: string;

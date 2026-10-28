@@ -1,8 +1,8 @@
 'use server';
 
-import { auth } from '@clerk/nextjs/server';
 import { redirect } from 'next/navigation';
 import { revalidatePath } from 'next/cache';
+import { getCachedAuth } from '@/lib/supabase/cached';
 import { createClerkSupabaseClient } from '@/lib/supabase/server';
 import type { Database } from '@/lib/supabase/types';
 
@@ -10,7 +10,7 @@ type StaffRow = Database['public']['Tables']['staff']['Row'];
 type StaffInsert = Omit<Database['public']['Tables']['staff']['Insert'], 'salon_id'>;
 
 async function requireAuth() {
-  const { userId } = await auth();
+  const { userId } = await getCachedAuth();
   if (!userId) redirect('/sign-in');
   return userId;
 }

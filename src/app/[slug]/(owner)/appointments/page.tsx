@@ -1,10 +1,11 @@
-import { createClerkSupabaseClient } from '@/lib/supabase/server';
+import { redirect } from 'next/navigation';
+import { getCachedOwnerSalon } from '@/lib/supabase/cached';
 import {
   listAppointments,
 } from '@/app/actions/owner/appointments';
 import { listStaff } from '@/app/actions/owner/staff';
 import { listServices } from '@/app/actions/owner/services';
-import type { SalonRow, AppointmentStatus } from '@/lib/supabase/types';
+import type { AppointmentStatus } from '@/lib/supabase/types';
 import { AppointmentCardWithDetails } from '@/components/owner/appointment-card-with-details';
 import { AppointmentStatusActions } from '@/components/owner/appointment-status-actions';
 import { FilterBar } from '@/components/owner/filter-bar';
@@ -38,13 +39,9 @@ export default async function AppointmentsPage({
   const { slug } = await params;
   const sp = await searchParams;
 
-  const supabase = createClerkSupabaseClient();
-  const { data: salonData } = await supabase
-    .from('salons')
-    .select('id, name, working_hours, time_format')
-    .eq('slug', slug)
-    .single();
-  const salon = salonData as SalonRow | null;
+  // getCachedOwnerSalon is already memoised for this request by OwnerLayout.
+  const salon = await getCachedOwnerSalon(slug);
+  if (!salon) redirect('/');
 
   const validStatuses: AppointmentStatus[] = ['pending', 'confirmed', 'cancelled'];
   const statusFilter =
@@ -52,19 +49,17 @@ export default async function AppointmentsPage({
       ? (sp.status as AppointmentStatus)
       : undefined;
 
-  const [appointments, staff, services] = salon
-    ? await Promise.all([
-        listAppointments(salon.id, {
-          dateFrom: sp.dateFrom ? `${sp.dateFrom}T00:00:00Z` : undefined,
-          dateTo:   sp.dateTo   ? `${sp.dateTo}T23:59:59Z`   : undefined,
-          status:   statusFilter,
-          staffId:  sp.staffId !== 'all' ? sp.staffId : undefined,
-          search:   sp.search,
-        }),
-        listStaff(salon.id),
-        listServices(salon.id),
-      ])
-    : [[], [], []];
+  const [appointments, staff, services] = await Promise.all([
+    listAppointments(salon.id, {
+      dateFrom: sp.dateFrom ? `${sp.dateFrom}T00:00:00Z` : undefined,
+      dateTo:   sp.dateTo   ? `${sp.dateTo}T23:59:59Z`   : undefined,
+      status:   statusFilter,
+      staffId:  sp.staffId !== 'all' ? sp.staffId : undefined,
+      search:   sp.search,
+    }),
+    listStaff(salon.id),
+    listServices(salon.id),
+  ]);
 
   return (
     <div className="p-4 md:p-6 flex flex-col gap-4">
@@ -72,16 +67,14 @@ export default async function AppointmentsPage({
       <div className="sticky top-0 z-20 bg-background pb-3 flex flex-col gap-3">
         <div className="flex items-center justify-between gap-4">
           <h1 className="text-xl font-semibold tracking-tight">Appointments</h1>
-          {salon && (
-            <NewAppointmentTrigger
-              salonId={salon.id}
-              salonSlug={slug}
-              staff={staff}
-              services={services}
-              workingHours={salon.working_hours as { start: string; end: string }}
-              timeFormat={salon.time_format || '12h'}
-            />
-          )}
+          <NewAppointmentTrigger
+            salonId={salon.id}
+            salonSlug={slug}
+            staff={staff}
+            services={services}
+            workingHours={salon.working_hours as { start: string; end: string }}
+            timeFormat={salon.time_format || '12h'}
+          />
         </div>
 
         {/* Filter bar */}
@@ -107,14 +100,14 @@ export default async function AppointmentsPage({
               <AppointmentCardWithDetails
                 key={a.id}
                 appointment={a}
-                salonId={salon?.id}
+                salonId={salon.id}
                 salonSlug={slug}
                 staff={staff}
                 services={services}
-                workingHours={salon?.working_hours as { start: string; end: string } | undefined}
-                timeFormat={salon?.time_format || '12h'}
+                workingHours={salon.working_hours as { start: string; end: string } | undefined}
+                timeFormat={salon.time_format || '12h'}
                 actions={
-                  salon && a.status !== 'cancelled' ? (
+                  a.status !== 'cancelled' ? (
                     <AppointmentStatusActions
                       appointment={a}
                       slug={slug}

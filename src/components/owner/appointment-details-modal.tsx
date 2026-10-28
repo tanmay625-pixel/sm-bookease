@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import dynamic from 'next/dynamic';
 import {
   Dialog,
   DialogContent,
@@ -9,12 +10,16 @@ import {
 } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { NewAppointmentModal } from '@/components/owner/new-appointment-modal';
 import type { AppointmentWithRelations } from '@/components/token-stub-card';
 import type { StaffRow, ServiceRow } from '@/lib/supabase/types';
 import { Pencil, Phone, User, Clock, CalendarDays, MessageSquare, Scissors } from 'lucide-react';
 import { formatISTTime, formatISTDate } from '@/lib/timezone';
 import { cn } from '@/lib/utils';
+
+const NewAppointmentModal = dynamic(
+  () => import('@/components/owner/new-appointment-modal').then((m) => m.NewAppointmentModal),
+  { ssr: false }
+);
 
 interface AppointmentDetailsModalProps {
   appointment: AppointmentWithRelations;

@@ -1,8 +1,6 @@
-import { auth } from '@clerk/nextjs/server';
 import { redirect } from 'next/navigation';
-import { createClerkSupabaseClient } from '@/lib/supabase/server';
+import { getCachedOwnerSalon, getCachedAuth } from '@/lib/supabase/cached';
 import { UserButton } from '@clerk/nextjs';
-import type { SalonRow } from '@/lib/supabase/types';
 import { OwnerSidebarNav, OwnerMobileNav } from '@/components/owner/owner-nav';
 import { Scissors } from 'lucide-react';
 import { ModeToggle } from '@/components/ui/theme-toggle';
@@ -14,6 +12,10 @@ import { ModeToggle } from '@/components/ui/theme-toggle';
  * 2. Confirms the authenticated Clerk user owns the salon with this slug
  *    (→ / if not)
  *
+ * Uses getCachedOwnerSalon() (React.cache) so any child page or server
+ * action called during this render tree that also calls getCachedOwnerSalon()
+ * receives the memoised result — eliminating N+1 Supabase round-trips.
+ *
  * params is a Promise in Next.js 16 — always await it.
  */
 export default async function OwnerLayout({
@@ -24,21 +26,15 @@ export default async function OwnerLayout({
   params: Promise<{ slug: string }>;
 }) {
   const { slug } = await params;
-  const { userId } = await auth();
 
+  // Auth check first — fast path before any DB work.
+  const { userId } = await getCachedAuth();
   if (!userId) {
     redirect('/sign-in');
   }
 
-  const supabase = createClerkSupabaseClient();
-
-  const { data: salonData } = await supabase
-    .from('salons')
-    .select('id, name')
-    .eq('slug', slug)
-    .eq('owner_clerk_id', userId)
-    .single();
-  const salon = salonData as SalonRow | null;
+  // Ownership check — result is memoised for child pages in this render.
+  const salon = await getCachedOwnerSalon(slug);
 
   if (!salon) {
     redirect('/');

@@ -1,9 +1,9 @@
 'use client';
 
 import { useState, useMemo, useEffect, useCallback } from 'react';
+import dynamic from 'next/dynamic';
 import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
-import { NewAppointmentModal } from '@/components/owner/new-appointment-modal';
 import { AppointmentDetailsModal } from '@/components/owner/appointment-details-modal';
 import {
   listAppointments,
@@ -13,6 +13,11 @@ import type { StaffRow, ServiceRow, WorkingHours } from '@/lib/supabase/types';
 import { cn } from '@/lib/utils';
 import { ChevronLeft, ChevronRight, Plus } from 'lucide-react';
 import { formatISTTime, formatISTDate, IST_OFFSET_MINUTES } from '@/lib/timezone';
+
+const NewAppointmentModal = dynamic(
+  () => import('@/components/owner/new-appointment-modal').then((m) => m.NewAppointmentModal),
+  { ssr: false }
+);
 
 // ---------------------------------------------------------------------------
 // Types

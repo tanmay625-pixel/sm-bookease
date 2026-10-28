@@ -1,8 +1,8 @@
 'use server';
 
-import { auth } from '@clerk/nextjs/server';
 import { revalidatePath } from 'next/cache';
 import { redirect } from 'next/navigation';
+import { getCachedAuth, getCachedOwnerSalon } from '@/lib/supabase/cached';
 import { createClerkSupabaseClient } from '@/lib/supabase/server';
 import { generateSlug } from '@/lib/slug';
 import type { SalonRow } from '@/lib/supabase/types';
@@ -13,7 +13,7 @@ import type { SalonRow } from '@/lib/supabase/types';
 // ─────────────────────────────────────────────
 
 export async function createSalon(name: string): Promise<{ slug: string }> {
-  const { userId } = await auth();
+  const { userId } = await getCachedAuth();
   if (!userId) redirect('/sign-in');
 
   const slug = await generateSlug(name);
@@ -49,7 +49,7 @@ export async function updateSalonSettings(
   salonId: string,
   settings: SalonSettings
 ): Promise<void> {
-  const { userId } = await auth();
+  const { userId } = await getCachedAuth();
   if (!userId) redirect('/sign-in');
 
   const supabase = createClerkSupabaseClient();
@@ -79,18 +79,9 @@ export async function updateSalonSettings(
 // ─────────────────────────────────────────────
 
 export async function getSalonBySlug(slug: string) {
-  const { userId } = await auth();
-  if (!userId) redirect('/sign-in');
-
-  const supabase = createClerkSupabaseClient();
-
-  const { data: salonData, error } = await supabase
-    .from('salons')
-    .select('*')
-    .eq('slug', slug)
-    .single();
-  const data = salonData as SalonRow | null;
-
-  if (error || !data) return null;
-  return data;
+  // Use the cached helper — deduplicates auth() + Supabase read within a
+  // single RSC render tree (e.g. calendar/page.tsx calling this after the
+  // layout already called getCachedOwnerSalon for the auth check).
+  const salon = await getCachedOwnerSalon(slug);
+  return salon;
 }

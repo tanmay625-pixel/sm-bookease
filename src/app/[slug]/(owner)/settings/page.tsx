@@ -1,8 +1,8 @@
-import { createClerkSupabaseClient } from '@/lib/supabase/server';
+import { redirect } from 'next/navigation';
+import { getCachedOwnerSalon } from '@/lib/supabase/cached';
 import { listStaff, createStaff } from '@/app/actions/owner/staff';
 import { listServices, createService } from '@/app/actions/owner/services';
 import { updateSalonSettings } from '@/app/actions/owner/salon';
-import type { SalonRow } from '@/lib/supabase/types';
 import { StaffEditRow } from './StaffEditRow';
 import { ServiceEditRow } from './ServiceEditRow';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -29,26 +29,15 @@ export default async function SettingsPage({
   params: Promise<{ slug: string }>;
 }) {
   const { slug } = await params;
-  const supabase = createClerkSupabaseClient();
 
-  const { data: salonData } = await supabase
-    .from('salons')
-    .select('*')
-    .eq('slug', slug)
-    .single();
-  const salon = salonData as SalonRow | null;
+  // getCachedOwnerSalon is already memoised for this request by OwnerLayout.
+  const salon = await getCachedOwnerSalon(slug);
+  if (!salon) redirect('/');
 
-  const [staffList, servicesList] = salon
-    ? await Promise.all([listStaff(salon.id), listServices(salon.id)])
-    : [[], []];
-
-  if (!salon) {
-    return (
-      <div className="p-4 md:p-6">
-        <p className="text-sm text-muted-foreground">Salon not found.</p>
-      </div>
-    );
-  }
+  const [staffList, servicesList] = await Promise.all([
+    listStaff(salon.id),
+    listServices(salon.id),
+  ]);
 
   const wh = salon.working_hours as { start: string; end: string };
 
