@@ -7,13 +7,15 @@ type StaffItem = {
   id: string;
   name: string;
   role: string | null;
-  phone: string | null;
+  phone: string;
   email: string | null;
 };
 
 export function StaffEditRow({ staff }: { staff: StaffItem }) {
   const [open, setOpen] = useState(false);
   const [isPending, startTransition] = useTransition();
+  const [phoneChanged, setPhoneChanged] = useState(false);
+  const [currentPhone, setCurrentPhone] = useState(staff.phone);
 
   function handleDelete() {
     startTransition(async () => {
@@ -22,14 +24,17 @@ export function StaffEditRow({ staff }: { staff: StaffItem }) {
   }
 
   function handleSave(formData: FormData) {
+    const rawPhone = formData.get('phone') as string;
+    const cleanPhone = rawPhone.replace(/\D/g, '').slice(-10);
     startTransition(async () => {
       await updateStaff(staff.id, {
         name: formData.get('name') as string,
         role: (formData.get('role') as string) || null,
-        phone: formData.get('phone') as string,
+        phone: cleanPhone,
         email: (formData.get('email') as string) || null,
       });
-      // Collapse after the server action + revalidation cycle completes
+      setPhoneChanged(false);
+      setCurrentPhone(cleanPhone);
       setOpen(false);
     });
   }
@@ -76,25 +81,38 @@ export function StaffEditRow({ staff }: { staff: StaffItem }) {
               placeholder="Role (optional)"
             />
           </div>
-          <div style={{ display: 'flex', gap: '0.5rem' }}>
-            <input
-              name="phone"
-              type="tel"
-              defaultValue={staff.phone ?? ''}
-              placeholder="9876543210"
-              required
-              inputMode="numeric"
-              maxLength={10}
-            />
-            <input
-              name="email"
-              type="email"
-              defaultValue={staff.email ?? ''}
-              placeholder="Email (optional)"
-            />
-            <button type="submit" disabled={isPending}>
-              {isPending ? 'Saving…' : 'Save'}
-            </button>
+          <div style={{ display: 'flex', gap: '0.5rem', flexDirection: 'column' }}>
+            <div style={{ display: 'flex', gap: '0.5rem' }}>
+              <input
+                name="phone"
+                type="tel"
+                defaultValue={staff.phone}
+                placeholder="9876543210"
+                required
+                inputMode="numeric"
+                pattern="[0-9]{10}"
+                maxLength={10}
+                onChange={(e) => {
+                  const val = e.target.value.replace(/\D/g, '').slice(0, 10);
+                  e.target.value = val;
+                  setPhoneChanged(val !== currentPhone);
+                }}
+              />
+              <input
+                name="email"
+                type="email"
+                defaultValue={staff.email ?? ''}
+                placeholder="Email (optional)"
+              />
+              <button type="submit" disabled={isPending}>
+                {isPending ? 'Saving…' : 'Save'}
+              </button>
+            </div>
+            {phoneChanged && (
+              <p style={{ fontSize: '0.75rem', color: '#d97706', margin: '0' }}>
+                ⚠ Changing the contact number will require the staff member to re-verify their WhatsApp number on next login and their current session will be invalidated.
+              </p>
+            )}
           </div>
         </form>
       )}

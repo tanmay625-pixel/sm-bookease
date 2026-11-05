@@ -45,13 +45,22 @@ export type Database = {
           name: string;
           role: string | null;
           email: string | null;
-          phone: string | null;
+          phone: string;
+          password_hash: string | null;
+          is_verified: boolean;
+          session_version: number;
+          password_set_at: string | null;
           created_at: string;
         };
         Insert: Omit<
           Database['public']['Tables']['staff']['Row'],
-          'id' | 'created_at'
-        >;
+          'id' | 'created_at' | 'is_verified' | 'session_version' | 'password_hash' | 'password_set_at'
+        > & {
+          is_verified?: boolean;
+          session_version?: number;
+          password_hash?: string | null;
+          password_set_at?: string | null;
+        };
         Update: Partial<Database['public']['Tables']['staff']['Insert']>;
       };
       services: {

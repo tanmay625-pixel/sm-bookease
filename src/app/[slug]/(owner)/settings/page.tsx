@@ -103,7 +103,7 @@ export default async function SettingsPage({
               <Input name="role"  placeholder="Role (optional)" />
             </div>
             <div className="grid grid-cols-2 gap-2">
-              <Input name="phone" type="tel" placeholder="Phone *" required />
+              <Input name="phone" type="tel" placeholder="Phone (10 digits) *" required maxLength={10} pattern="[0-9]{10}" inputMode="numeric" />
               <Input name="contact" type="email" placeholder="Email (optional)" />
             </div>
             <Button type="submit" size="sm" className="self-start">Add Staff</Button>
