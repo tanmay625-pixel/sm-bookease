@@ -91,7 +91,7 @@ export function BookingFlow({
       }
   }
 
-  const initStep: Step = initServices.length > 0 && initialParams?.time ? 4 : 1;
+  const initStep: Step = initServices.length > 0 && initialParams?.time ? 3 : 1;
 
   const [step, setStep] = useState<Step>(initStep);
   const [selectedServices, setSelectedServices] = useState<ServiceRow[]>(initServices);
@@ -470,13 +470,25 @@ export function BookingFlow({
           </div>
 
           <div className="mt-6">
-            <Button
-              className="w-full"
-              disabled={checkingAvailability || !availability?.available}
-              onClick={() => setStep(4)}
-            >
-              Continue to Confirm →
-            </Button>
+            {!isSignedIn ? (
+              checkingAvailability || !availability?.available ? (
+                <Button className="w-full" disabled>
+                  Sign in to continue →
+                </Button>
+              ) : (
+                <Button className="w-full" asChild>
+                  <Link href={signInHref}>Sign in to continue →</Link>
+                </Button>
+              )
+            ) : (
+              <Button
+                className="w-full"
+                disabled={checkingAvailability || !availability?.available}
+                onClick={() => setStep(4)}
+              >
+                Continue to Confirm →
+              </Button>
+            )}
           </div>
         </div>
       )}
@@ -543,7 +555,7 @@ export function BookingFlow({
             <Button
               className="w-full"
               onClick={handleConfirm}
-              disabled={bookingPending}
+              disabled={bookingPending || !availability?.available}
             >
               {bookingPending ? 'Booking…' : 'Book Appointment'}
             </Button>
